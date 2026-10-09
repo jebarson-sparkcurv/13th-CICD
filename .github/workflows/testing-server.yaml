@@ -872,7 +872,7 @@ jobs:
           echo "Testing EC2 deployment: SUCCESS"
 
           echo "============================================"
-  # ============================================================
+   # ============================================================
   # JOB 4 - CREATE PULL REQUEST
   # ============================================================
 
@@ -885,7 +885,14 @@ jobs:
 
     if: ${{ needs.deploy-testing.result == 'success' }}
 
+    permissions:
+      contents: read
+      pull-requests: write
+
     steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Create Pull Request
         env:
@@ -906,6 +913,7 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Pull request #$EXISTING_PR already exists."
+            echo "No new PR will be created."
             exit 0
           fi
 
