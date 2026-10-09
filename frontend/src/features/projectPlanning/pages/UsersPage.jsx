@@ -200,12 +200,13 @@ function UserModulesModal({ user, onClose, tenantAllowed, moduleLabels, onSaved 
   const [inherit, setInherit] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
-    const has = user.allowed_modules || [];
-    setInherit(has.length === 0);
-    setSelected(new Set(has));
-  }, [user?.id]);
+   useEffect(() => { 
+    if (!user) return; 
+    const has = user.allowed_modules || []; 
+    setInherit(has.length === 0); 
+    setSelected(new Set(has)); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); 
 
   if (!user) return null;
 
