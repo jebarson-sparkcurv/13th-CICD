@@ -537,26 +537,20 @@ jobs:
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
             "for i in \$(seq 1 30); do pg_isready && break; sleep 2; done"
-
-
-          # ----------------------------------------------------
-          # CREATE / UPDATE DATABASE USER
-          # ----------------------------------------------------
-
-          # ----------------------------------------------------
-              # CREATE / UPDATE DATABASE USER
-              # ----------------------------------------------------
-              
-              ssh \
-                -i ~/.ssh/testing-server-key \
-                "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-                "sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"DO \\\$\\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='buildcore') THEN CREATE ROLE buildcore LOGIN; END IF; END \\\$\\\$;\""
-              
-              ssh \
-                -i ~/.ssh/testing-server-key \
-                "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-                "sudo -u postgres psql -v db_password=\"$TEST_DATABASE_PASSWORD\" -v ON_ERROR_STOP=1 -c \"ALTER ROLE buildcore WITH PASSWORD :'db_password';\""
-              
+            
+            # ----------------------------------------------------
+            # CREATE / UPDATE DATABASE USER
+            # ----------------------------------------------------
+            
+            ssh \
+              -i ~/.ssh/testing-server-key \
+              "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+              "sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"DO \\\$\\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='buildcore') THEN CREATE ROLE buildcore LOGIN; END IF; END \\\$\\\$;\""
+            
+            ssh \
+              -i ~/.ssh/testing-server-key \
+              "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+              "sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"ALTER ROLE buildcore WITH PASSWORD '$TEST_DATABASE_PASSWORD';\""
 
           # ----------------------------------------------------
           # CREATE DATABASE
