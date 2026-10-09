@@ -543,11 +543,20 @@ jobs:
           # CREATE / UPDATE DATABASE USER
           # ----------------------------------------------------
 
-          ssh \
-            -i ~/.ssh/testing-server-key \
-            "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "sudo -u postgres psql -v db_password=\"$TEST_DATABASE_PASSWORD\" -v ON_ERROR_STOP=1 -c \"DO \\\$\\\$ BEGIN IF EXISTS (SELECT FROM pg_roles WHERE rolname='buildcore') THEN ALTER ROLE buildcore WITH PASSWORD :'db_password'; ELSE CREATE ROLE buildcore LOGIN PASSWORD :'db_password'; END IF; END \\\$\\\$;\""
-
+          # ----------------------------------------------------
+              # CREATE / UPDATE DATABASE USER
+              # ----------------------------------------------------
+              
+              ssh \
+                -i ~/.ssh/testing-server-key \
+                "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+                "sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"DO \\\$\\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='buildcore') THEN CREATE ROLE buildcore LOGIN; END IF; END \\\$\\\$;\""
+              
+              ssh \
+                -i ~/.ssh/testing-server-key \
+                "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+                "sudo -u postgres psql -v db_password=\"$TEST_DATABASE_PASSWORD\" -v ON_ERROR_STOP=1 -c \"ALTER ROLE buildcore WITH PASSWORD :'db_password';\""
+              
 
           # ----------------------------------------------------
           # CREATE DATABASE
