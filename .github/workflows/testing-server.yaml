@@ -7,6 +7,10 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "20"
@@ -868,3 +872,78 @@ jobs:
           echo "Testing EC2 deployment: SUCCESS"
 
           echo "============================================"
+  # ============================================================
+  # JOB 4 - CREATE PULL REQUEST
+  # ============================================================
+
+  create-pr:
+    name: Create PR - Developer to Main
+    runs-on: ubuntu-latest
+
+    needs:
+      - deploy-testing
+
+    if: ${{ needs.deploy-testing.result == 'success' }}
+
+    steps:
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+        run: |
+          set -e
+
+          echo "Testing deployment succeeded."
+          echo "Creating Pull Request: developer -> main"
+
+          EXISTING_PR=$(gh pr list \
+            --base main \
+            --head developer \
+            --state open \
+            --json number \
+            --jq '.[0].number')
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Pull request #$EXISTING_PR already exists."
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head developer \
+            --title "Developer → Main | BuildCore" \
+            --body "## BuildCore Promotion
+
+          The developer branch successfully completed the CI/CD pipeline.
+
+          ### Tests completed
+
+          - Backend dependencies installed
+          - Backend tests passed
+          - Frontend dependencies installed
+          - Frontend build passed
+          - Testing EC2 deployment succeeded
+          - Backend health check passed
+          - Nginx health check passed
+
+          ### Source
+
+          \`developer\`
+
+          ### Target
+
+          \`main\`
+
+          ### Build
+
+          Commit: \`${{ github.sha }}\`
+
+          Build number: \`${{ github.run_number }}\`
+
+          The application is currently deployed on the testing server.
+
+          **PM approval is required before merging into main.**
+          "
+
+          echo "Pull Request created successfully."
