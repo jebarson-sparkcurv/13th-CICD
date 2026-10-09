@@ -665,7 +665,27 @@ jobs:
           ssh \
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "rsync -a /tmp/buildcore-deployment/deployment/frontend/ ${{ env.APP_DIR }}/frontend/"
+                      "rsync -a /tmp/buildcore-deployment/deployment/frontend/ ${{ env.APP_DIR }}/frontend/"
+            # ----------------------------------------------------
+          # CONFIGURE SWAP
+          # ----------------------------------------------------
+          
+          ssh \
+            -i ~/.ssh/testing-server-key \
+            "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+            "if [ ! -f /swapfile ]; then \
+                sudo fallocate -l 2G /swapfile && \
+                sudo chmod 600 /swapfile && \
+                sudo mkswap /swapfile && \
+                sudo swapon /swapfile; \
+             elif ! sudo swapon --show | grep -q '/swapfile'; then \
+                sudo swapon /swapfile; \
+             fi"
+          
+          ssh \
+            -i ~/.ssh/testing-server-key \
+            "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+            "free -h"          
 
           
           # ----------------------------------------------------
