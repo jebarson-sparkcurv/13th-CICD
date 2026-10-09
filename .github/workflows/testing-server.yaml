@@ -165,7 +165,7 @@ jobs:
       - name: Build frontend
         working-directory: ${{ env.FRONTEND_DIR }}
         env:
-          REACT_APP_BACKEND_URL: http://${{ secrets.TEST_SERVER_HOST }}/api
+          REACT_APP_BACKEND_URL: http://${{ secrets.TEST_SERVER_PUBLIC_HOST }}
         run: |
           yarn build
 
