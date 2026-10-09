@@ -1,0 +1,30 @@
+{
+  "summary": "Iter 23 — focused verification of the send-for-approval absolute-URL + visible email-error fix. Backend: created /app/backend/tests/test_iter23_absolute_urls.py (4/4 pass) verifying POST /api/estimates/{id}/send-approval returns approve_url + reject_url that (a) start with 'https://', (b) contain the preview host, (c) end with correct ?action=approve|reject, (d) include /estimate-approval/{id}/{token}; email_sent=false and email_error is a non-empty string (SMTP 535 BadCredentials — EXPECTED); Origin header override does not break the absolute-URL invariant (env FRONTEND_URL takes precedence); the returned public link actually approves the estimate end-to-end via the no-auth /api/public/estimate-approval endpoint. Regression: /app/backend/tests/test_iter22_estimate_approval.py (14/14) + test_iter21_estimates.py (22/22) still pass — 36/36 pass in 18s. Frontend Playwright: Admin login -> created TEST_absurl_ui_<ts> estimate via /api/estimates -> /admin/estimates -> send-approval-{id} -> approval-client-email + submit -> approval-sent-result visible with (a) amber 'Email failed to send' warning, (b) new data-testid='email-error-detail' element showing 'Reason: (535, ...BadCredentials...)' (SMTP failure surfaced to UI as designed), (c) two <code> elements both starting with 'https://portal-construction.preview.emergentagent.com/estimate-approval/22/<token>?action=approve|reject' (ABSOLUTE), (d) copy-approve-link button click fires success toast 'Approve link copied' (clipboard readback denied by Playwright sandbox permission — not an app bug). Regression: opened the approve_url in a FRESH browser context (no cookies/login) -> estimate-approval-page rendered -> public-approve-button clicked -> approval-done panel visible, confirming the absolute link is end-to-end valid. Both bug fixes (absolute URL fallback + visible email error reason) are working as intended. SMTP 535 BadCredentials remains expected and is correctly surfaced to the user.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_absolute_urls.py",
+    "/app/test_reports/pytest/iter23_results.xml",
+    "/app/backend/tests/test_iter22_estimate_approval.py",
+    "/app/backend/tests/test_iter21_estimates.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "estimates.py send_for_approval — base URL fallback chain (FRONTEND_URL env -> Origin header -> x-forwarded-proto+host -> request.url.scheme+host) is solid and produces absolute URLs in all observed cases; consider logging which source was used so on-prem operators can debug quickly if the env var is missing.",
+    "send_approval_email — 'SMTP not configured' guard raises RuntimeError which propagates to email_error in response. Consider distinguishing config-missing vs auth-failed via structured error field (e.g., {code:'SMTP_AUTH_FAILED', detail:...}) so the frontend can render tailored copy — currently we show raw '(535, b'5.7.8...')' bytes-repr in the UI which is a bit ugly for end users.",
+    "SendForApprovalModal.jsx line 75 — String(result.email_error).slice(0,180) truncates but includes Python bytes-string repr like 'b\\'5.7.8 ...\\''. Consider a helper that strips b'...' wrapper for cleaner display; non-blocking.",
+    "The email_error message is truncated at 180 chars which is reasonable, but for the 535 case the truncation cuts off the Message-ID. Fine, since the actionable info ('BadCredentials' + support URL) fits within 180 chars.",
+    "Clipboard writeText failure in constrained browser contexts (no permission) currently only shows an 'Uncaught runtime error' overlay in dev mode; production build should be fine but consider wrapping navigator.clipboard.writeText in try/catch with a manual selection fallback for older/embedded browsers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter23_absolute_urls.py",
+    "/app/test_reports/iteration_23.json"
+  ],
+  "success_rate": {"backend": "100% (4/4 iter23 + 36/36 regression iter21+iter22)", "frontend": "100% (all send-for-approval + public flow assertions)"},
+  "test_credentials": "See /app/memory/test_credentials.md — Admin kesari4416@gmail.com / admin123 used.",
+  "seed_data_creation": "Created ~6 TEST_absurl_* estimates via API (backend tests) + TEST_absurl_ui_<ts> via frontend flow. All prefixed with TEST_ for cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The absolute-URL fallback and email-error-detail UI are both working end-to-end. If SMTP creds are ever fixed, email_sent will become true and email-error-detail will not render — flip that branch in the test. The public /estimate-approval/:id/:token page continues to work no-auth. Consider cleanup pass for the growing TEST_* estimate rows.",
+  "rca of the issue": "Original bug: relative approval URLs when FRONTEND_URL env unset. Fix (verified): send_for_approval builds base = FRONTEND_URL || Origin header || (x-forwarded-proto+host) || request.url.scheme+host, then rstrip('/'). Ensures absolute URL in every deployment. Second fix (verified): SendForApprovalModal now renders data-testid='email-error-detail' with 'Reason: ...' text so users see why email failed. Third fix (verified): send_approval_email raises 'SMTP not configured' RuntimeError when env keys missing, which propagates to email_error in response body."
+}

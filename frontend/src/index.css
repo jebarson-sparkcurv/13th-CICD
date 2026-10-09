@@ -1,0 +1,433 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------
+ * Sitera Design System — "Architectural Swiss"
+ * Slate base + Amber accent, calm enterprise finance aesthetic
+ * Inspired by Zoho Books, refined for construction operations.
+ * ------------------------------------------------------------- */
+:root {
+  --background: 210 40% 98%;      /* #F8FAFC */
+  --foreground: 222 47% 11%;      /* #0F172A */
+  --card: 0 0% 100%;              /* #FFFFFF */
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 222 47% 11%;         /* Slate 900 — for primary actions */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%; /* Slate 500 */
+  --accent: 32 95% 44%;            /* Amber 600 — brand accent for active state */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 45%;        /* Rose 600 */
+  --destructive-foreground: 0 0% 98%;
+  --success: 142 71% 36%;          /* Emerald 700 */
+  --warning: 45 93% 47%;
+  --info: 199 89% 42%;             /* Sky 600 */
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 32 95% 44%;              /* Amber 600 focus ring */
+  --radius: 0.75rem;               /* rounded-xl for cards */
+  --chart-1: 32 95% 44%;
+  --chart-2: 199 89% 42%;
+  --chart-3: 142 71% 36%;
+  --chart-4: 258 90% 66%;
+  --chart-5: 215 16% 47%;
+}
+
+.dark {
+  --background: 222 47% 4%;        /* #020617 near-black slate */
+  --foreground: 210 40% 96%;
+  --card: 222 47% 8%;              /* #0F172A slate 900 */
+  --card-foreground: 210 40% 96%;
+  --popover: 222 47% 8%;
+  --popover-foreground: 210 40% 96%;
+  --primary: 210 40% 96%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 33% 14%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 217 33% 12%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 38 92% 50%;            /* Amber 500 — brighter in dark for contrast */
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 142 64% 47%;
+  --warning: 45 93% 55%;
+  --info: 199 89% 55%;
+  --border: 217 33% 15%;
+  --input: 217 33% 15%;
+  --ring: 38 92% 50%;
+}
+
+:root {
+  --gauge-track: #e2e8f0;
+  --tooltip-bg: #ffffff;
+  --tooltip-border: #e2e8f0;
+  --tooltip-color: #0f172a;
+}
+.dark {
+  --gauge-track: #1e293b;
+  --tooltip-bg: #0f172a;
+  --tooltip-border: #334155;
+  --tooltip-color: #f1f5f9;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "cv11", "ss01", "ss03";
+}
+
+.font-heading {
+  font-family: 'Outfit', 'IBM Plex Sans', system-ui, sans-serif;
+  letter-spacing: -0.015em;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+::selection {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid #f1f5f9;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-color: #0f172a;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+/* -----------------------------------------------------------------------------
+ * Global overflow guard
+ * ---------------------------------------------------------------------------
+ * Long, unbreakable strings (e.g. Indian-formatted currency ₹1,06,91,08,000 or
+ * ₹55,53,96,822.50) were forcing grid tracks and flex items to grow past their
+ * container, causing horizontal overflow across Projects, Finance, Estimates,
+ * etc. Setting min-width: 0 on all grid/flex children restores intrinsic
+ * shrinking behaviour without altering any layout that already sized itself.
+ * --------------------------------------------------------------------------- */
+:where(.grid) > *,
+:where([class*="flex"]) > * {
+  min-width: 0;
+}
+
+/* Long financial/numeric values used to break mid-digit ("₹1,52,5\n1,38,01\n0")
+ * because overflow-wrap:anywhere was too aggressive. New rule: keep the number
+ * intact and let CSS clamp() shrink font to always fit its card's inline size.
+ * .num-wrap is now a no-op safety net (kept for existing callsites). */
+.num-wrap {
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+/* Auto-fitting large numeric display for stat/KPI cards.
+ * Apply container-type on the surrounding card, and .stat-value on the number.
+ * Font scales with card width (cqi) so ₹1,52,51,38,010 fits at any density. */
+.stat-card { container-type: inline-size; }
+.stat-value {
+  font-family: 'Outfit', 'IBM Plex Sans', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: clamp(1.25rem, 10cqi, 2.5rem);
+}
+
+/* Ensure the app root never scrolls the whole viewport horizontally. Individual
+ * scrolling regions (tables) still opt-in via overflow-x-auto. */
+html, body, #root {
+  overflow-x: clip;
+}
+
+
+.grain-bg {
+  position: relative;
+}
+.grain-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fade-up 0.45s ease both;
+}
+
+/* ---------------------------------------------------------------
+ * Component utilities — Architectural Swiss patterns
+ * ------------------------------------------------------------- */
+
+/* Surface cards: subtle bordered panel with gentle hover lift */
+.surface {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: var(--radius);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.surface-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -12px hsl(222 47% 11% / 0.12);
+  border-color: hsl(var(--border));
+}
+.dark .surface-hover:hover {
+  box-shadow: 0 8px 24px -12px hsl(0 0% 0% / 0.6);
+}
+
+/* Sticky glass topbar for page headers */
+.glass-header {
+  background: hsl(var(--background) / 0.75);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid hsl(var(--border) / 0.8);
+}
+
+/* Amber "brand pill" — active nav, active tab, primary CTA emphasis */
+.pill-accent {
+  background: hsl(var(--accent) / 0.12);
+  color: hsl(var(--accent));
+  border: 1px solid hsl(var(--accent) / 0.28);
+}
+
+/* Data table row hover — subtle, no jarring shift */
+.row-hover:hover {
+  background: hsl(var(--muted) / 0.6);
+}
+.dark .row-hover:hover {
+  background: hsl(var(--muted) / 0.4);
+}
+
+/* Focus ring — amber for consistency with brand */
+.ring-brand:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.5);
+}
+
+/* Scale-tap: press-down feedback on interactive elements */
+.tap-scale:active {
+  transform: scale(0.98);
+}
+
+/* ---------------------------------------------------------------
+ * Phase 2 — Module polish patterns
+ * ------------------------------------------------------------- */
+
+/* Segmented tab strip — replaces the old "border-bottom underline" trigger */
+.tab-strip {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: hsl(var(--muted));
+  border-radius: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-strip::-webkit-scrollbar { display: none; }
+.tab-strip [data-state="active"] {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px hsl(222 47% 11% / 0.06), 0 0 0 1px hsl(var(--border));
+}
+.dark .tab-strip [data-state="active"] {
+  background: hsl(217 33% 18%);
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.4), 0 0 0 1px hsl(var(--border));
+}
+
+/* KPI horizontal scroller for mobile — snap-aligned cards */
+.kpi-scroller {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 78%;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.kpi-scroller::-webkit-scrollbar { display: none; }
+.kpi-scroller > * { scroll-snap-align: start; }
+@media (min-width: 640px) {
+  .kpi-scroller {
+    display: grid;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: repeat(var(--kpi-cols, 2), minmax(0, 1fr));
+    overflow: visible;
+  }
+}
+@media (min-width: 1024px) {
+  .kpi-scroller {
+    grid-template-columns: repeat(var(--kpi-cols-lg, 4), minmax(0, 1fr));
+    gap: 1rem;
+  }
+}
+
+/* Data table — refined row aesthetics */
+.data-table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.data-table thead th {
+  background: hsl(var(--muted) / 0.4);
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+  white-space: nowrap;
+}
+.data-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  vertical-align: middle;
+}
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.data-table tbody tr {
+  transition: background-color 0.12s ease;
+}
+.data-table tbody tr:hover {
+  background: hsl(var(--muted) / 0.4);
+}
+
+/* Mobile row card — a table row transformed into a card on small screens */
+.row-card {
+  display: none;
+}
+@media (max-width: 767px) {
+  .table-desktop { display: none !important; }
+  .row-card { display: block; }
+}
+
+/* Floating Action Button — used on Field Ops attendance & similar */
+.fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-radius: 999px;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 12px 32px -8px hsl(222 47% 11% / 0.4), 0 4px 12px hsl(222 47% 11% / 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px -8px hsl(222 47% 11% / 0.5), 0 6px 16px hsl(222 47% 11% / 0.2);
+}
+.fab:active { transform: scale(0.98); }
+
+/* Chip / tag */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+.chip-success { border-color: hsl(142 71% 36% / 0.3); background: hsl(142 71% 36% / 0.08); color: hsl(142 71% 30%); }
+.dark .chip-success { color: hsl(142 64% 60%); }
+.chip-danger { border-color: hsl(0 84% 45% / 0.3); background: hsl(0 84% 45% / 0.08); color: hsl(0 84% 40%); }
+.dark .chip-danger { color: hsl(0 72% 65%); }
+.chip-warning { border-color: hsl(38 92% 50% / 0.35); background: hsl(38 92% 50% / 0.1); color: hsl(32 95% 40%); }
+.dark .chip-warning { color: hsl(38 92% 60%); }
+.chip-info { border-color: hsl(199 89% 42% / 0.3); background: hsl(199 89% 42% / 0.08); color: hsl(199 89% 38%); }
+.dark .chip-info { color: hsl(199 89% 60%); }
+
+/* Section header — consistent Phase 2 pattern */
+.section-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.65;
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+@media print {
+  /* Hide the full-app chrome when printing (sidebar, top-bar). Print-friendly
+     pages should mark their own containers with `print-visible` or rely on
+     Tailwind `print:` utilities. */
+  aside, nav, header[data-testid="app-header"], .no-print { display: none !important; }
+  body, html { background: #fff !important; }
+  main, [data-testid="app-main"] { margin: 0 !important; padding: 0 !important; }
+}

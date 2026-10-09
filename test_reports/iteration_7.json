@@ -1,0 +1,42 @@
+{
+  "summary": "Retest of iteration-6 HIGH bug (inline Add Category auto-select). Bug REPRODUCED and is NOT FIXED despite the setQueryData + invalidateQueries changes applied to EmployeeCategoryFormModal.jsx. Category is created and persisted in DB, and the new category IS present as an option when the Select is reopened, but the [data-testid=employee-category-select] trigger still shows the placeholder 'Select trade' after the category modal closes. Consequently the employee is submitted with category_id=null and appears in se-attendance-list without a role subtitle (shown as '—'). Verified on both SE (/portal/site-engineer) and Admin (/admin/projects/1 -> tab-employees) flows.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "EmployeeFormModal + EmployeeCategoryFormModal (inline Add Category flow)",
+        "issue": "After category-form-submit closes the category modal, Radix Select trigger still displays 'Select trade' placeholder instead of the newly-created category name. DOM diagnostics show the hidden <select> underneath the Radix trigger has value='5' (Carpenter's seed id) rather than the new category's id (e.g. 15) even though the toast confirms the new category name. This strongly suggests form.category_id in EmployeeFormModal is NOT being updated to String(cat.id) by the onCreated callback (or is being overwritten/lost) — the setQueryData cache-warming fix alone is insufficient.",
+        "selector": "[data-testid=employee-category-select]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Inline Add Category -> auto-select -> submit employee",
+        "issue": "Employee POST is sent with category_id=null; employee appears in se-attendance-list without any role subtitle. Same behavior for Admin flow at /admin/projects/1 tab-employees.",
+        "affected_selectors": ["[data-testid=employee-category-select]", "[data-testid=employee-form-submit]", "[data-testid=se-attendance-list]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "rca of the issue": "Reproduction: 1) Login raj@buildcore.com/engineer123 2) /portal/site-engineer 3) pick project 4) Add Employee 5) open category select, click '+ Add Category' 6) submit RETEST_Diag_<ts> 7) category modal closes; DB now has the new category (id=15); reopening the Select shows the option present; BUT the closed trigger reads 'Select trade' and no aria-selected=true option exists; the hidden <select> value is '5' (Carpenter) — not the new id. RCA hypothesis: The iteration-6 assumption ('Radix has no matching SelectItem because cache hasn't updated yet') was incorrect. Even with setQueryData executed BEFORE onCreated, the Radix Select popover is CLOSED at that instant, so SelectItems are not mounted and Radix's internal value<->text store is not populated for the new id. In addition (and this is the real defect visible in the DOM), form.category_id itself is not being set to String(cat.id) — the hidden native select value stays at a stale seed value ('5'). Likely causes to investigate: (a) onCreated in EmployeeFormModal uses setForm((f) => ({ ...f, category_id: String(cat.id), wage_type: ... })) — verify this is actually invoked (add console.log) and that `cat.id` is a number not string mismatched vs SelectItem `String(c.id)`; (b) invalidateQueries triggering a refetch may cause a re-render race where the useEffect resets form (though deps are [open, employee] so unlikely); (c) Radix onValueChange for '__new' may fire again after modal closes with a stale committed value ('5') and overwrite category_id — inspect whether Radix Select re-commits an internal value on close after cancelling a '__new' item. Mitigation candidates: (1) In onCategorySelect, on '__new' explicitly retain current category_id and prevent Radix from committing '__new' by returning early AND resetting Select's internal state — e.g. render Select with `key={form.category_id || 'empty'}` to force remount after onCreated so items mount and value binds correctly; (2) In EmployeeCategoryFormModal.submit(), after setQueryData, call onCreated inside a `queueMicrotask` or `setTimeout(..,0)` so the parent Select re-renders with new categories before the trigger tries to display; (3) Best fix: after onCreated sets category_id, briefly open+close the Select programmatically to force item mount, OR use SelectValue with children so display text isn't dependent on mounted items — pass a computed label to SelectValue based on categories.find(). Recommended fix (simplest & robust): render `<SelectValue placeholder='Select trade'>{categories?.find(c=>String(c.id)===form.category_id)?.name}</SelectValue>` so the trigger reads label from the categories cache directly and is independent of Radix's internal item-text store.",
+  "test_report_links": [],
+  "action_items": [
+    "The iteration-6 HIGH bug is NOT resolved — do not close it. Apply the SelectValue-children fix (render categories.find(...).name as SelectValue's child) which decouples trigger display from Radix's mounted-SelectItem store.",
+    "Additionally, add a console.log in EmployeeFormModal's onCreated to confirm setForm actually runs with the new id — the hidden <select> currently shows value=5 (Carpenter), suggesting form.category_id is not being set to the new id. Investigate whether Radix Select's onValueChange fires on close and overwrites category_id.",
+    "After fix, retest both SE and Admin inline flows and verify (a) trigger shows the new category name, (b) employee is created with category_id set, and (c) attendance list shows the new category as role subtitle.",
+    "Cleanup: 4 stray RETEST_* categories were left in the DB (RETEST_Painter_1786300461, RETEST_Painter_1786300577, RETEST_Verify_1786300647, RETEST_Diag_1786300695) plus RETEST_Emp_1786300461 employee — remove after fix retest."
+  ],
+  "critical_code_review_comments": [
+    "EmployeeCategoryFormModal.submit(): the ordering (setQueryData -> invalidateQueries -> onCreated -> onOpenChange) is fine, but relies on Radix Select having mounted SelectItems, which it does not while the popover is closed. This is a fundamentally wrong assumption.",
+    "EmployeeFormModal Select uses `<SelectValue placeholder='Select trade' />` without children — the trigger display therefore depends entirely on Radix's internal text store which is only populated by mounted SelectItems. This makes the component fragile whenever the underlying options list changes while the Select is closed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (skipped as requested)", "frontend": "0% (0/2 inline-flow scenarios pass — SE fails, Admin fails)"},
+  "test_credentials": "raj@buildcore.com/engineer123, kesari4416@gmail.com/admin123 (used successfully)",
+  "seed_data_creation": "Left in DB: categories RETEST_Painter_1786300461 (id 13), RETEST_Painter_1786300577 (id 14), RETEST_Verify_1786300647, RETEST_Diag_1786300695; employee RETEST_Emp_1786300461 on Metro Depot Complex.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "The iter-6 HIGH bug persists. Main agent needs to apply a different fix — recommended: use SelectValue children with categories.find lookup, and verify form.category_id is actually being set (hidden native select currently reads a stale seed id, not the new id). After the fix, only need to retest the two inline flows described in the review request."
+}

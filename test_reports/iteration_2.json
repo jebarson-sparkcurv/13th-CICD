@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 2 — validated new construction-portal features (dashboard-summary + stat-card filters, has_issues filter, milestones CRUD, phase reorder, archive endpoint, delete update, documents CRUD incl. client-scoped visibility, and Client role UI restrictions). Backend: 20/20 pytest passing in test_new_features.py (regression suite test_api.py still green). Frontend: all 15 UI checks passing — stat cards render correct values from summary endpoint (5 / 2 / 2 / ₹89.5Cr), Ongoing/Issues cards toggle URL params and are mutually exclusive, Total clears filters, Total Budget opens budget-breakdown-dialog without filtering the table, bookmarkable ?has_issues=true works, document upload with custom name/category submits and renders immediately, search + category filter narrow the list, rename modal saves, delete confirms and removes, live count updates: posting a Blocked update on clean Project 4 correctly increments With Issues from 2 → 3 (dashboardSummary invalidation working). Client role: no upload card, no rename/delete buttons, internal docs hidden (Site Plan Rev A hidden, Contract Final v2 visible), client-scoped stat cards show only client-1 projects (2 total, 1 ongoing, 0 issues, ₹37Cr).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/test_api.py",
+    "/app/test_reports/pytest/iter2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MilestoneCreate schema uses field name `title` (schemas/__init__.py:110) but the review-request spec called it `name`. Not a bug (frontend not yet consuming milestones UI) — just document that clients must send {title, sequence_order, status}.",
+    "DocumentUploadCard sends is_client_visible as a string ('true'/'false') via FormData; FastAPI Form(bool) accepts it, but the false path relies on any-non-empty=True in some frameworks. Current backend correctly parses it. Consider explicit fd.append('is_client_visible', visible ? 'true' : 'false') for clarity.",
+    "usePostUpdate is now correctly invalidating dashboardSummary via invalidateProject → live count works. The iteration-1 optimistic-key mismatch bug has been fixed (useUpdatesFeed keys on Number(projectId) now).",
+    "DialogContent missing aria-describedby warning triggers on rename modal — a11y polish only.",
+    "Client dashboardSummary total_budget shows ₹37Cr for client_id=1 (Skyline Tower A ₹25Cr + Mall Extension ₹12Cr) — matches seed, correct."
+  ],
+  "updated_files": ["/app/backend/tests/test_new_features.py"],
+  "success_rate": {"backend": "100% (20/20 new + 16/16 regression)", "frontend": "100% (15/15 UI checks)"},
+  "test_credentials": "Admin kesari4416@gmail.com/admin123, Site Engineer raj@buildcore.com/engineer123, Client priya@skyline.com/client123 (from /app/memory/test_credentials.md).",
+  "seed_data_creation": "All TEST_ prefixed data (milestones, uploaded docs, progress updates, temp project) was cleaned up during the test runs. No lingering fixtures. The archive test archived one temp project (TEST_archive_target) — verified 404 after archive; it stays in DB with is_archived=true (correct behavior).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Feature-complete for iteration 2. All 4 dashboard stat cards + documents panel + role-based visibility working end-to-end. Milestone testids/UI not present in frontend yet (only backend endpoints exist) — if UI is added later, test create-Done sets completed_at, list ordered by sequence_order, patch toggles status. Progress-update flag select testid is 'update-flag-select' (not 'update-status-flag-select'). Radix Select options: click trigger, wait 200-300ms, page.get_by_role('option', name=...).click(force=True). Live-count update requires status_flag=Blocked/Delayed on the LATEST update of a previously-clean project.",
+  "rca of the issue": "N/A — no bugs found this iteration. Iteration-1 optimistic-update RCA (React Query key type mismatch) has been resolved: useUpdatesFeed(Number(projectId)) is now used consistently with usePostUpdate's key. Confirmed by seeing feed items update and the With Issues card increment live after a Blocked post."
+}

@@ -1,0 +1,25 @@
+{
+  "summary": "Iter 21 — Full test of new Estimates module (backend + frontend). Created /app/backend/tests/test_iter21_estimates.py with 22 pytest cases covering lookups, RBAC (Admin/Accountant/SiteEngineer 200; Client/Vendor 403), CI-dedup for categories/statuses, POST validation (missing project_name/amount<=0/invalid category -> 422), delete RBAC (SE 403, Admin 204, missing 404), and upload endpoint broadened roles (Accountant + SiteEngineer 201; Client 403) — 22/22 pass in 4.23s. Frontend Playwright: logged in as Admin, navigated to /admin/estimates, verified estimates-page + estimates-table + create-estimate-button render; opened estimate-form-modal, validated empty-form disables submit, negative(-5) & 0 amounts show estimate-amount-error, filled project + phase + inline-added new category ('TEST_Landscaping_<ts>') via estimate-category-inline-form -> auto-selected in estimate-category-select, uploaded a 1x1 PNG via estimate-drawing-input -> estimate-drawing-preview thumbnail appeared, inline-added new status ('TEST_OnHold_<ts>') -> auto-selected in estimate-status-select, submitted -> success toast + modal closed + new row appears in estimates-table with drawing thumbnail and status badge. PDF flow: created another estimate uploading a small PDF; list row rendered red 'PDF' link (no img thumbnail). Cancel closes without saving. Delete: window.confirm accepted -> row removed and 'Estimate deleted' toast. Everything green.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter21_estimates.py",
+    "/app/test_reports/pytest/iter21_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "estimates.py — clean, small router with proper Pydantic validation (Field(gt=0) enforces amount>0; min_length=1 for project_name). Good CI-dedup pattern (ilike). ensure_defaults() called on GET is idempotent and safe.",
+    "uploads.py — roles broadened correctly (Admin/SiteEngineer/Accountant/ProcurementOfficer). 10MB size check reads full body first — acceptable at this scale but for larger files consider streaming/chunk-check to avoid memory spike.",
+    "EstimateFormModal.jsx — good use of qc.setQueryData in onCreated callback avoiding the auto-select race that iter20 flagged for AddExpenseModal (this is the correct pattern; consider back-porting).",
+    "InlineAddSelect.jsx — reusable and clean. Note: the sentinel '__add_new__' is placed as first SelectItem; if a user presses Enter/space navigating with keyboard it could accidentally trigger — acceptable trade-off for compact UX.",
+    "EstimatesPage.jsx renders drawing<img> without lazy-loading — for large lists consider loading='lazy'. Non-blocking."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter21_estimates.py"],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "100% (14/14 flows)"},
+  "test_credentials": "See /app/memory/test_credentials.md — all 5 roles verified.",
+  "seed_data_creation": "Created via UI: 1 estimate 'TEST_Lakeview Bungalow' (Structure, TEST_Landscaping_<ts>, TEST_OnHold_<ts>, PNG drawing, ₹750000); PDF estimate created then deleted. Via API: 'TEST_Lakeview_pytest', 2 CI-dedup categories (TEST_LandCI), 1 status (TEST_OnHoldCI), 3 upload artifacts. Riverside Villa (from previous iteration) still present.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Estimates module is production-ready. Backend router at /app/backend/app/routers/estimates.py, models Estimate/EstimateCategory/EstimateStatus. Run pytest backend/tests/test_iter21_estimates.py -o addopts='' — 22 tests, ~4s. Frontend page /admin/estimates with EstimateFormModal + reusable InlineAddSelect (good pattern for future inline-add UX). No open bugs.",
+  "rca of the issue": "N/A — no issues found."
+}

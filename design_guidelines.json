@@ -1,0 +1,153 @@
+{
+  "theme": {
+    "philosophy": "Architectural Swiss - A hybrid of 'Zoho Books' enterprise precision and modern 'Earthy/Organic' construction aesthetics. Information-dense, extremely polished, with high contrast structural greys and vibrant Amber accents.",
+    "modes": ["light", "dark"],
+    "default": "light"
+  },
+  "typography": {
+    "strategy": "The 'Old Money Tech' variant adapted for construction.",
+    "fonts": {
+      "headings": "Outfit",
+      "body": "IBM Plex Sans",
+      "mono": "JetBrains Mono"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl font-semibold tracking-tight leading-tight",
+      "h2": "text-2xl sm:text-3xl font-medium tracking-tight",
+      "h3": "text-xl sm:text-2xl font-medium",
+      "h4": "text-lg font-medium",
+      "body": "text-sm md:text-base leading-relaxed",
+      "small": "text-xs font-medium tracking-wide",
+      "overline": "text-xs uppercase tracking-[0.2em] font-semibold text-muted-foreground"
+    },
+    "rules": [
+      "No generic fonts (Inter/Roboto) for headings.",
+      "Headings must use tight letter spacing.",
+      "Data tables and financial ledgers must use tabular numbers (font-variant-numeric: tabular-nums) in IBM Plex Sans."
+    ]
+  },
+  "colors": {
+    "light": {
+      "background": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "text_primary": "#0F172A",
+      "text_secondary": "#64748B",
+      "brand_accent": "#D97706",
+      "border": "#E2E8F0",
+      "success": "#16A34A",
+      "warning": "#EAB308",
+      "danger": "#DC2626",
+      "info": "#0284C7"
+    },
+    "dark": {
+      "background": "#020617",
+      "surface": "#0F172A",
+      "text_primary": "#F8FAFC",
+      "text_secondary": "#94A3B8",
+      "brand_accent": "#F59E0B",
+      "border": "#1E293B",
+      "success": "#22C55E",
+      "warning": "#FDE047",
+      "danger": "#EF4444",
+      "info": "#38BDF8"
+    },
+    "rules": [
+      "Avoid #000000 or #FFFFFF for pure backgrounds; always tint with Slate.",
+      "Amber/Brand Accent is reserved strictly for primary actions, current active states, and the 'RA' in the Sitera logo.",
+      "Do not use gradients for data-heavy sections (ledgers, tables)."
+    ]
+  },
+  "spacing_and_layout": {
+    "generous_spacing": "Use p-6 or p-8 inside cards instead of standard p-4. Container padding should be px-4 sm:px-8.",
+    "grid_system": "Bento-style grids for dashboards. Dense, high-utilization grid for analytics (grid-cols-1 md:grid-cols-2 lg:grid-cols-4). gap-4 or gap-6.",
+    "borders_and_radii": {
+      "radius": "rounded-xl for cards, rounded-lg for buttons, rounded-md for inputs.",
+      "style": "Use crisp 1px borders (border-border/60) to separate components instead of heavy drop shadows."
+    },
+    "surfaces": {
+      "cards": "Solid background, 1px subtle border, no shadow by default. Hover: slight lift (-translate-y-1) and shadow-md.",
+      "headers": "Glassmorphism: backdrop-blur-xl bg-background/80 with 1px bottom border."
+    }
+  },
+  "components": {
+    "buttons": "Pill-shaped or slightly rounded (rounded-lg). Primary actions use brand_accent or text_primary inverted. Add explicit hover states (hover:bg-slate-800 text-white).",
+    "inputs_and_forms": "Use Shadcn Input, Select, DatePicker. Background should match surface, 1px border. Focus state must use ring-2 ring-brand_accent/50.",
+    "tables": "Shadcn Table. MUST have horizontal scrolling wrapper for mobile. Sticky headers. Hover states on rows (hover:bg-muted/50). Tabular data right-aligned.",
+    "tabs": "Shadcn Tabs. Do not use generic full-width pills; use refined bottom-border active states (Architectural UI) or subtle segmented controls.",
+    "drawers_and_modals": "Use Shadcn Dialog for desktop (max-w-2xl usually) and Shadcn Sheet (bottom/side drawer) for mobile views to preserve screen real estate.",
+    "kpi_cards": "Flat, cardless feel or 1px bordered boxes. Use large numeric typography (text-3xl font-semibold) with a subtle icon in the top right. Include trend indicators (e.g., +2.5%).",
+    "toasts": "Use 'sonner' library. Position bottom-right for desktop, top-center for mobile."
+  },
+  "screen_guidelines": {
+    "auth_and_public": {
+      "desktop": "Split screen: left side architectural/construction abstract visual, right side clean login form.",
+      "mobile": "Single column, focus on form. Estimate-approval public page must look like a polished invoice document."
+    },
+    "admin_dashboard": {
+      "desktop": "Top row: 5 KPI stat cards. Middle: Overall Portfolio (Donut) + Projects by Status (Bar). Bottom: Gantt chart + Milestones.",
+      "mobile": "KPI cards become a horizontal swipeable list (snap-x). Charts stack vertically with full width."
+    },
+    "projects": {
+      "desktop": "Tabbed navigation (Overview, Phases, Tracking, etc.). Balance Sheet tab features a strict 7-column table with 'Opening Balance b/f' as first row and 'Totals c/f' as last row.",
+      "mobile": "Tabs become a scrollable horizontal list or a select dropdown. Balance Sheet MUST have sticky first column (Date/Voucher) and horizontal scroll for the rest. Preserve 7 columns."
+    },
+    "field_ops_portal": {
+      "desktop": "Clean, large touch-friendly rows for attendance marking (P/A/HD).",
+      "mobile": "PRIORITY: Needs to function like a native mobile app. Large tap targets for marking attendance. Floating Action Button (FAB) for adding labour payment."
+    },
+    "clients_and_finance": {
+      "desktop": "Rich data tables. Indian-comma currency formatting is STRICTLY required (e.g., ₹1,06,91,08,000.00).",
+      "mobile": "Collapse less critical table columns behind an 'expand' chevron, or use card-based list views instead of standard tables."
+    },
+    "estimates_and_vendors": {
+      "desktop": "Estimate list shows masonry or grid of drawing thumbnails. Quotation UI looks like a live spreadsheet.",
+      "mobile": "Thumbnails in a standard vertical feed. Quotation creation is split into step-by-step mobile forms."
+    }
+  },
+  "navigation_ia": {
+    "sidebar": "Desktop: Fixed left sidebar (w-64). Contains the wordmark 'SITE<span class=\"text-amber-500\">RA</span>' and 'S+' logo mark. Collapsible into icon-only mode.",
+    "mobile_drawer": "Mobile: Hidden on load, toggled via hamburger menu in a sticky top nav. Uses Shadcn Sheet (left side).",
+    "breadcrumbs": "Required on all deep pages (e.g., Projects > Project Name > Change Orders)."
+  },
+  "motion_and_microinteractions": {
+    "page_transitions": "Subtle fade-in (opacity 0 to 1) and slight upward slide (translate-y-4 to 0) using Framer Motion on route change.",
+    "interactions": "Buttons scale down slightly on active (scale: 0.98). Table rows subtle background shift on hover. Stat cards lift up 2px on hover."
+  },
+  "accessibility": {
+    "contrast": "Ensure minimum 4.5:1 ratio for text. Muted text must still be readable on Slate 50 or Slate 950.",
+    "focus": "All interactive elements must have a visible focus ring (focus-visible:ring-2 focus-visible:ring-amber-500).",
+    "keyboard": "Preserve keyboard navigation for tabs and tables."
+  },
+  "media": {
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc4NzkyNzcwN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Woman portrait for Client/Admin avatar placeholder"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc4NzkyNzcwN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Man portrait for Site Engineer/Vendor avatar placeholder"
+      }
+    ],
+    "thumbnails": [
+      {
+        "url": "https://images.unsplash.com/photo-1762146828422-50a8bd416d3c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwzfHxjb25zdHJ1Y3Rpb24lMjBzaXRlJTIwYXJjaGl0ZWN0dXJlJTIwYmx1ZXByaW50c3xlbnwwfHx8fDE3ODc5Mjc3MTJ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Architectural blueprints for Estimate thumbnail placeholder"
+      }
+    ]
+  },
+  "universal_guidelines_for_main_agent": [
+    "CRITICAL: Do NOT change any route paths, API endpoints, or data-testid names. The QA suite depends on them.",
+    "CRITICAL: Preserve the exact 7-column Balance Sheet ledger structure.",
+    "CRITICAL: Preserve the Indian-comma currency formatter (₹1,06,91,08,000).",
+    "CRITICAL: Preserve the role-based navigation visibility logic (JWT auth based).",
+    "CRITICAL: Implement the logo strictly as: SITE<span class='text-amber-500'>RA</span>.",
+    "Use Shadcn UI components extensively but customize classes to match the 'Architectural Swiss' theme (crisp borders, exact padding).",
+    "Do NOT use HTML <select> or <input type='date'>; strictly use Shadcn dropdowns and datepickers.",
+    "Mobile view is Priority #1. Ensure tables scroll horizontally and KPI cards snap-scroll.",
+    "Always apply transitions for interactive elements; avoid 'transition: all' to prevent breaking transforms.",
+    "Use Phosphor Icons or Lucide React for crisp, enterprise-grade iconography.",
+    "Ensure 'sonner' is used for all toasts.",
+    "Do not center-align app containers; respect natural reading flow for dense text and data."
+  ]
+}

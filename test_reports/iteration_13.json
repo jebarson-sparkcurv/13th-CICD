@@ -1,0 +1,22 @@
+{
+  "summary": "Iteration 13 — Verified client read-only Field Ops RBAC + budget preview fix. Backend: 11/11 pytest passing (test_iter13_client_fieldops_rbac.py). Frontend: verified client Field Ops (view-only note, project scoped, attendance-status-* badges, no add btn, no org register); admin Field Ops regression (Add Employee + org register with wages present); budget preview shows '= ₹25.00 Cr' for 250000000 as expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter13_client_fieldops_rbac.py",
+    "/app/test_reports/pytest/iter13.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Layout.jsx uses data-testid='nav-field ops' (contains space) — works but consider 'nav-field-ops' for consistency with hyphenated convention.",
+    "Recharts renders with width(-1) height(-1) warnings on client dashboard when container not yet sized — minor cosmetic console noise, no functional impact."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter13_client_fieldops_rbac.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "From /app/memory/test_credentials.md — Admin kesari4416@gmail.com/admin123, Client priya@skyline.com/client123, SE raj@buildcore.com/engineer123",
+  "seed_data_creation": "None (used existing seed). Test project TEST_iter13_budget was created via POST /api/projects and cleaned up via DELETE in same test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter13 targets pass: client Field Ops RBAC (200 own project with masked wage/phone/id_proof fields, 403 other projects & POST & org register), SE/Admin regression (visible wages), budget preview '= ₹25.00 Cr'. Frontend routes are /admin/* and /portal/site-engineer (Field Ops). Project 1&2 → client 1 (Skyline); project 3 → client 2 (GreenField).",
+  "rca of the issue": "N/A — verification pass only, no bugs found."
+}

@@ -1,0 +1,38 @@
+{
+  "summary": "Tested Phase Description/Notes feature end-to-end. Backend (9/9) passes: notes returned by POST/GET /projects/{id}/phases and PATCH /phases/{id}; empty description skipped; notification bell fires PhaseNote to non-actors; DELETE phase with notes returns 204. FRONTEND CRITICAL BUG: phase notes are NOT rendered in the UI even though the API returns them correctly, because ProjectDetailPage reads phases from GET /api/projects/{id} (project_out detail) which does NOT include the `notes` array. Only GET /api/projects/{id}/phases includes notes. Result: TC-PD-03/04/06 fail in UI — user never sees history under phase timeline.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/projects/{id}", "issue": "project_out(detail=True) returns phases via phase_out() which omits `notes`. UI consumes this endpoint, so history never renders. Fix: include notes in phase_out when called from project_out detail path (or have frontend also fetch /projects/{id}/phases and merge, or switch PhaseTimeline data source).", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PhaseTimeline", "issue": "phase-notes-{id} container never rendered because project.phases (from useProject → GET /projects/{id}) has no `notes` field. Verified in DOM: querySelector returns NOT FOUND right after creating a phase whose API response has notes=1.", "selector": "[data-testid=phase-notes-{id}]", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "Add/Edit Phase with description → history render", "issue": "API stores + returns note correctly (verified), but ProjectDetailPage never receives the notes array from its data source. Toast shows 'Phase added', new phase appears, but no dated note card underneath.", "affected_selectors": ["[data-testid=phase-notes-{id}]", "[data-testid^=phase-note-]"]}
+    ],
+    "design_issues": [
+      {"screen": "PhaseFormModal", "issues": ["Missing aria-describedby on DialogContent (console warning) — minor a11y"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_phase_notes.py", "/app/test_reports/pytest/phase_notes.xml"],
+  "action_items": [
+    "CRITICAL: Fix data source for PhaseTimeline. Simplest fix — in /app/backend/app/crud/__init__.py::project_out (detail branch), replace `[phase_out(ph) for ph in p.phases]` with a variant that attaches notes per phase (query PhaseNote grouped by phase_id, same as phase_notes_map). Or make phase_out accept a notes_map argument. Alternatively, in ProjectDetailPage.jsx switch to a dedicated `usePhases(projectId)` hook that calls GET /projects/{id}/phases and pass those to <PhaseTimeline>. After fix, TC-PD-03/04/06 UI checks will pass (backend already good)."
+  ],
+  "critical_code_review_comments": [
+    "Duplication risk: notes are attached in list_phases and add/update_phase responses but NOT in project_out — two sources of truth for phases in the response layer; consolidate.",
+    "PhaseFormModal Textarea: on Edit, description is intentionally reset to '' (correct — each edit is a new note) — good.",
+    "record_phase_note trims text and skips empty properly — confirmed via TC-PD-06 backend test with '   ' input.",
+    "notify_flag excludes actor (recipients.discard(actor.id)) — means if the only Admin is the actor, no Admin notification is generated. Not a bug because SE is still notified; document behavior or seed a second Admin if the spec strictly requires 'all admins'."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase_notes.py (new)"],
+  "success_rate": {"backend": "100%", "frontend": "40% (form + submit work; history render broken)"},
+  "test_credentials": "Admin kesari4416@gmail.com/admin123, SE raj@buildcore.com/engineer123 — confirmed working.",
+  "seed_data_creation": "No persistent seed created; all TEST_ phases cleaned up (verified via GET /projects/1/phases returning only 1,2,3).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes project_out to include notes in the detail phases array (or FE switches data source), re-run /app/backend/tests/test_phase_notes.py (should still pass) and re-execute the Playwright flow — verify [data-testid=phase-notes-{id}] appears in DOM right after phase create with description. Only 1 admin exists (id=1) so admin self-notification is naturally suppressed; test admin-notification path by creating the phase as SE (raj@buildcore.com).",
+  "rca of the issue": "GET /api/projects/{id} returns phases via crud.project_out(detail=True) which calls phase_out(ph) — a serializer that intentionally omits the `notes` field. The `notes` field is only appended in add_phase, update_phase, and list_phases (via phase_notes_map). Frontend PhaseTimeline is rendered from `project.phases` populated by useProject → GET /api/projects/{id}, so the notes array is undefined and the `(ph.notes || []).length > 0` guard in PhaseTimeline.jsx suppresses the whole `phase-notes-{id}` block. Reproduction: (1) login admin, (2) /admin/projects/1 → Phases tab, (3) Add Phase with description, (4) confirm API POST response has notes=[{...}], (5) inspect DOM — no [data-testid=phase-notes-{id}] element. Mitigation: attach notes in project_out detail (single DB pass via phase_notes_map(db, p.id)) OR fetch phases via GET /projects/{id}/phases in the detail page."
+}

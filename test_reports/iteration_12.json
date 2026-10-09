@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 12 — Balance Sheet endpoints (org + project) and invoice share buttons (Print/WhatsApp/Email). All backend RBAC + math tests pass (8/8). Frontend: OrgBalanceSheetTab, ProjectBalanceSheetTab, invoice share buttons all render with correct data-testids; transactions sorted latest-first; loss project row (Skyline Tower A / bs-row-1) highlighted red; Print opens popup with BUILDCORE/INVOICE HTML; WhatsApp opens wa.me URL with invoiceText payload. Client role correctly restricted (no balancesheet/employees tabs; 403 on both new endpoints). Site Engineer correctly gets 403 on org balance sheet but 200 on project balance sheet.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter12_balance_sheet.py",
+    "/app/test_reports/pytest/iter12.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "finance.py is now 578 lines — approaching the 700-line split threshold; consider extracting balance-sheet endpoints into a separate module (balance_sheet.py) in the next iteration.",
+    "OrgBalanceSheetTab.jsx and ProjectBalanceSheetTab.jsx re-declare identical fmt/fmtCr helpers — extract to shared utils.",
+    "project_ledger() call inside project_balance_sheet passes `user` from STAFF but ledger uses its own STAFF dependency; works but is a leaky abstraction (function invoked directly rather than reusing computed data). Not a bug — refactor opportunity.",
+    "Console has recharts width/height(-1) warnings on dashboard (pre-existing, not related to this iteration)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (all requested selectors + flows verified)"},
+  "test_credentials": "Admin kesari4416@gmail.com/admin123, Client priya@skyline.com/client123, Site Engineer raj@buildcore.com/engineer123, Accountant asha@buildcore.com/accountant123 — all working via /api/auth/login.",
+  "seed_data_creation": "None. Read-only verification against existing seeded data (Project 1 Skyline Tower A with rich payments/expenses/attendance).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Balance sheet endpoints stable: GET /api/finance/balance-sheet (Admin/Accountant only) and GET /api/projects/{id}/balance-sheet (staff, not Client). Frontend tabs live at /admin/finance (fin-tab-balancesheet) and /admin/projects/{id} (tab-balancesheet). Invoice share buttons pattern: invoice-print-{id} / invoice-whatsapp-{id} / invoice-email-{id} on ProjectFinancePage; overdue-print-{id}/overdue-whatsapp-{id}/overdue-email-{id} on FinancePage overview. Test file test_iter12_balance_sheet.py already covers all RBAC and math invariants."
+}

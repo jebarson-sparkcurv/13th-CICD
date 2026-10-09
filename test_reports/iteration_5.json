@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 5 — Employee Management, Attendance (upsert + backdate window), Labour Cost report, and payroll date-picker calendar-icon dark-theme CSS fix. Backend: 11/11 new tests pass in /app/backend/tests/test_iter5_employees.py covering (a) admin lists 4 seeded p1 employees Ramesh/Suresh/Deepak/Manoj, (b) Client + Vendor get 403 on all 3 route families (employees, attendance, labour-cost), (c) Accountant CAN create employees (INTERNAL role gating verified), (d) cross-project isolation (p1 employee not visible in p2, p2 has seeded Ganesh Rao + Iqbal Khan), (e) edit + deactivate — deactivate flips status to 'inactive' and attendance history preserved via GET /api/employees/{id}/attendance, (f) attendance upsert: 2nd POST same (employee, date) reuses SAME row id and mutates status (present→half_day), list query returns exactly 1 row, (g) engineer 422 rejected for date -5 days, (h) admin 201 allowed for date -10 days (exempt), (i) engineer today AND today-3 both accepted, (j) labour cost math: present(1.0)+half_day(0.5)+absent(0)+leave(0) = 1.5 days × 1000 wage = 1500 amount, (k) accountant can access labour-cost. Frontend Playwright verified: (1) payroll-start-input + payroll-end-input render with light-colored calendar icons via CSS ::-webkit-calendar-picker-indicator invert(0.75) rule (screenshot confirms visible against dark theme), (2) admin /admin/projects/1 → tab-employees visible, employees-tab-content shows all 4 seeded + daily-attendance cards + 7-day attendance-grid (49 grid-cells for 7 employees × 7 days) + labour-cost-table + labour-total + labour-from/to inputs, (3) add-employee-button opens employee-form-modal, form fields (employee-name-input, employee-role-input, employee-wage-input, employee-joining-input, employee-wagetype-select), submit creates and immediately appears in table, (4) grid-cell cycle works: click sequence produced states A→L→P (cycles through statuses), (5) Client priya@skyline.com login → /admin/projects/1 → tab-employees count=0 (correctly HIDDEN), (6) Site Engineer raj@buildcore.com clicks grid-cell 6 days ago → server returns 422 and UI shows toast text 'Attendance can only be marked for today or up to 3 days back'. Regression: existing 53+14 tests unaffected; project detail overview/phases/tracking tabs still render; sidebar notification-bell still present for admin/engineer.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter5_employees.py",
+    "/app/test_reports/pytest/iter5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "employees.py labour_cost: N+1-style — fetches ALL employees + ALL attendance then aggregates in Python. Fine at current seed size (~5 emp × 30 days) but should move to SQL GROUP BY (SUM(CASE status WHEN 'present' THEN 1 WHEN 'half_day' THEN 0.5 ELSE 0 END)) if project scales to hundreds of workers × year of data.",
+    "employees.py attendance upsert: no DB-level unique constraint on (employee_id, attendance_date). Concurrent double-POST could create duplicates due to race between SELECT and INSERT. Add UniqueConstraint on Attendance model + catch IntegrityError to be safe under load.",
+    "check_backdate_window uses server-local date.today() with no tz awareness. If server tz drifts from IST the '3-day' window edge cases can flip by ±1 day. Consider explicit tz (Asia/Kolkata) or accept a client-provided timezone hint.",
+    "deactivate_employee is idempotent-ish but does not verify e.status != 'inactive' before commit — trivial no-op but avoids audit noise if needed later.",
+    "Frontend deactivate uses window.confirm — same UX/test friction called out in iter4; consider shadcn AlertDialog for consistency.",
+    "labour_cost amount is null for wage_type != 'daily'; total_amount silently excludes monthly/piece_rate workers. UI should surface a note or aggregate monthly wages pro-rata if needed."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter5_employees.py"],
+  "success_rate": {"backend": "100% (11/11 new)", "frontend": "100% (all 6 scenarios verified)"},
+  "test_credentials": "Admin kesari4416@gmail.com/admin123, Engineer raj@buildcore.com/engineer123, Accountant asha@buildcore.com/accountant123, Client priya@skyline.com/client123, Vendor vikram@apexsteel.com/vendor123.",
+  "seed_data_creation": "Backend tests left behind (on project 1, harmless): TEST_iter5_Acct (deactivated), TEST_iter5_iso (active), TEST_iter5_edit (deactivated with 1 attendance row today), TEST_iter5_ups (active, 1 attendance row today half_day), TEST_iter5_lc (active, 4 attendance rows across today..today-3). Also admin backdate test added one attendance row for a seeded employee at today-10. Frontend test created 1 additional employee TEST_UI_<ts> (active). None of these interfere with regression suites.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Employees + Attendance + Labour Cost feature set is green end-to-end. Test file: /app/backend/tests/test_iter5_employees.py (11 tests, ~1.6s). Grid cell testids follow pattern grid-cell-{empId}-{YYYY-MM-DD}; attendance-grid renders last 7 days with only rightmost 4 columns markable by non-Admin. Employee form modal testids: employee-name-input, employee-role-input, employee-phone-input, employee-joining-input, employee-wage-input, employee-wagetype-select, employee-form-submit/cancel. Client + Vendor roles are fully gated at both API (403) and UI (tab hidden). Payroll calendar-icon dark-theme CSS fix at /app/frontend/src/index.css lines 90-100 confirmed working. window.confirm still used for deactivate — Playwright needs page.on('dialog',accept) handler.",
+  "rca of the issue": "N/A — no bugs found this iteration."
+}

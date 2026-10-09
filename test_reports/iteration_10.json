@@ -1,0 +1,43 @@
+{
+  "summary": "Iter10 — Verified all 4 fix TCs (TC_PROJECTS_001, FINANCE_001/002/003) plus regressions. Backend: 7/7 pytest passed (expense-categories list/create/duplicate-409/rename+propagation; project finance summary revenue_last_year/cost_last_year/period_from/period_to; regressions on org dashboard-summary, projects list, project invoices). Frontend: admin login OK; New Project modal shows both manual project-location-input and detect-location-button — detect falls back to raw coordinates '12.9700, 77.5900' because Nominatim is CORS-blocked from the preview origin (expected fallback per note); Project Finance page shows 'REVENUE FROM CLIENT' ₹4.00 Cr with pf-income-period '1 year · 2025-08-10 → 2026-08-10' and 'EXPENSE' ₹9.03 Cr with same pf-cost-period; expense-categories-panel lists 11 rows (8 seed + prior TEST_ leftovers), add via new-category-add works (11→12), rename via window.prompt propagates in UI, expense-category-select dropdown is present in expense form.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/expense-categories/{id}", "issue": "Not implemented (405). Test-created categories cannot be cleaned up; residual TEST_* rows accumulate across runs."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "detect-location-button", "issue": "Nominatim reverse geocode blocked by CORS from preview origin (net::ERR_FAILED). Frontend gracefully falls back to raw 'lat, lon' string — functional but user sees coordinates instead of a place name. Consider proxying Nominatim via backend to get human-readable city.", "affected_selectors": ["detect-location-button","project-location-input"]}
+    ],
+    "design_issues": [
+      {"screen": "Multiple modals", "issues": ["Radix DialogContent missing Description / aria-describedby (a11y console warnings)"]},
+      {"screen": "Dashboard charts", "issues": ["Recharts container width/height=-1 warnings (chart parent has 0 dim during initial mount)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter10_finance_categories.py",
+    "/app/test_reports/pytest/iter10.xml"
+  ],
+  "action_items": [
+    "(Optional) Implement DELETE /api/expense-categories/{id} so tests / users can clean up added categories (currently 405).",
+    "(Optional) Proxy Nominatim through backend to bypass browser CORS so detect-location returns a place name instead of raw coordinates.",
+    "(Optional a11y) Add DialogDescription / aria-describedby to Radix DialogContent instances."
+  ],
+  "critical_code_review_comments": [
+    "expense-categories PATCH correctly propagates rename to Expense rows (verified via API test).",
+    "project_finance summary correctly exposes revenue_last_year, cost_last_year, period_from, period_to (365-day window).",
+    "No sensitive info leaked; JWT via httpOnly cookies + Authorization fallback both work."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter10_finance_categories.py (new)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% of TCs verified"},
+  "test_credentials": "kesari4416@gmail.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Test created two TEST_ITER10_* expense categories and one TEST_UI_<ts>[_R] category via UI. Cannot be deleted (no DELETE endpoint) — leftover rows present but harmless.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "expense-categories has no DELETE — accumulating TEST_* rows are expected. Nominatim is CORS-blocked from preview origin; detect-location falls back to raw lat/lon which is still a pass per the request. Use unique category names per run.",
+  "rca of the issue": "N/A — all reported fixes verified working."
+}

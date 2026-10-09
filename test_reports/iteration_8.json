@@ -1,0 +1,43 @@
+{
+  "summary": "FINAL RETEST of iteration-6/7 HIGH bug (inline '+ Add Category' auto-select in EmployeeFormModal). ALL 3 REQUIRED SCENARIOS PASS. The fix (SelectValue children reading label from categories cache + onCategorySelect ignoring empty '' values + optimistic setQueryData) resolves the bug on both Site Engineer and Admin flows, and regression (picking existing category + edit modal showing saved category) still works. Bug is CLOSED.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "scenarios_tested": [
+    {
+      "scenario": "SE inline flow: login raj -> /portal/site-engineer -> se-add-employee-button -> open category select -> add-category-option -> create RETEST7_SE_1786301449 -> submit employee RETEST7_SEemp_1786301449",
+      "result": "PASS",
+      "details": "Trigger [data-testid=employee-category-select] displayed 'RETEST7_SE_1786301449' immediately after category modal closed (no longer 'Select trade'). Employee was saved and appeared in se-attendance-list with new category as subtitle."
+    },
+    {
+      "scenario": "Admin inline flow: login kesari admin -> /admin/projects/1 -> tab-employees -> add-employee-button -> create RETEST7_AD_1786301449 -> submit employee RETEST7_ADemp_1786301449",
+      "result": "PASS",
+      "details": "Trigger showed 'RETEST7_AD_1786301449' after category creation. Employee row visible in Employee Register with the new category as role."
+    },
+    {
+      "scenario": "Regression: pick existing category 'Carpenter' from dropdown, submit RETEST7_REG_1786301449; reopen edit modal for another employee -> trigger shows saved category ('Electrician')",
+      "result": "PASS",
+      "details": "Existing-category selection persisted on submit (RETEST7_REG row shows Carpenter). Edit modal opened with the saved category name displayed on the Select trigger, confirming SelectValue children lookup works for pre-existing form.category_id too."
+    }
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "MINOR (not related to this bug): Site Engineer login for raj@buildcore.com initially redirected the browser to /admin (URL after login was /admin instead of /portal/site-engineer). Test worked around it by explicit page.goto. Worth main agent verifying the post-login redirect logic for Site Engineer role.",
+    "Cleanup leftover RETEST7_* data if desired: categories RETEST7_SE_1786301449, RETEST7_AD_1786301449; employees RETEST7_SEemp_1786301449, RETEST7_ADemp_1786301449, RETEST7_REG_1786301449 (all on project id 1 Metro Depot Complex). Also prior iteration-7 leftovers listed in iteration_7.json still exist."
+  ],
+  "critical_code_review_comments": [
+    "Fix approach is sound and matches iteration-7 recommendation: SelectValue children decouples the trigger label from Radix's internal item registry so it works even when SelectItems for the new category aren't mounted yet. The `if (!v) return;` guard in onCategorySelect correctly prevents Radix's empty-value onValueChange from wiping form.category_id when the category modal closes.",
+    "Optimistic qc.setQueryData in EmployeeCategoryFormModal is a nice UX touch — the new option shows up instantly if user reopens the dropdown before the invalidateQueries refetch."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (skipped as requested)", "frontend": "100% (3/3 scenarios pass)"},
+  "test_credentials": "raj@buildcore.com/engineer123 and kesari4416@gmail.com/admin123 both worked.",
+  "seed_data_creation": "Created (left in DB): categories RETEST7_SE_1786301449, RETEST7_AD_1786301449; employees RETEST7_SEemp_1786301449, RETEST7_ADemp_1786301449, RETEST7_REG_1786301449 on Metro Depot Complex (project 1).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iteration-6/7 HIGH bug is CLOSED after the SelectValue-children + empty-value-guard + optimistic-setQueryData fix. Only follow-up worth watching: SE role login redirect (raj was pushed to /admin briefly before manual navigation to /portal/site-engineer) — may or may not be an actual bug depending on intended post-login routing."
+}

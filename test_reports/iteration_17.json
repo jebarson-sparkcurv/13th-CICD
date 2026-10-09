@@ -1,0 +1,19 @@
+{
+  "summary": "RETEST after fix to get_project attaching phase_notes_map to detail phases. Backend 9/9 pytest passes. UI: TC-PD-03/04/06 now ALL PASS — phase-notes-{id} container renders with newest-first dated notes; empty-description edit keeps count unchanged. TC-PD-05: Notification bell shows 'Phase note: ...' entries; verified ADMIN receives PhaseNote when SE (raj) creates a phase with description (previous gap resolved). Cleanup: all TEST_ phases deleted (204).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_phase_notes.py", "/app/test_reports/pytest/phase_notes_iter17.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "phase_notes_map is now invoked in 4 places (get_project, list_phases, add_phase, update_phase). Consider extracting into phase_out(ph, notes_map=None) to consolidate response serialization.",
+    "Prior aria-describedby warning on DialogContent still emitted — non-blocking a11y."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (TC-PD-03, TC-PD-04, TC-PD-05, TC-PD-06)"},
+  "test_credentials": "Admin kesari4416@gmail.com/admin123, SE raj@buildcore.com/engineer123 — working.",
+  "seed_data_creation": "None persisted. All TEST_ phases created and cleaned up (verified DELETE=204 and DOM absence).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase Notes feature is fully working end-to-end. Data source fix in /app/backend/app/routers/projects.py::get_project (lines 165-168) attaches notes via phase_notes_map to project_out detail phases. Correct testids: add-phase-button, phase-name-input, phase-order-input (NOT sequence-input), phase-percent-input, phase-description-input, phase-form-submit, phase-delete-button (inside modal, not on timeline). Notification bell testid is notification-bell.",
+  "rca of the issue": "Fixed. Root cause was project_out(detail) not populating notes on nested phases; solved by mapping notes via phase_notes_map(db, project_id) into out['phases'] in the /projects/{id} handler."
+}

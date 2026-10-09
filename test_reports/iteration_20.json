@@ -1,0 +1,38 @@
+{
+  "summary": "Iter 20 — Full backend + frontend testing of the new Add Transaction feature (Income + Expense) with cross-module sync. 20 new pytests for /api/transactions/* plus 41 regression pytests (test_change_orders + test_iter19_exports_and_sweep) — all 61 pass. Frontend Add Income modal fully validated: project/phase/amount/radio/balance-preview with live auto-calc + override warning + toast including 'balance override logged'. Add Expense modal validated with existing-vendor + existing-product path — auto-quotation VQ-3-003 was generated and visible on procurement page (VQ-3-001..003). pf-add-income-button + pf-add-expense-button present on project finance page. Admin regression sweep across dashboard/projects/finance/payroll/clients/users/vendors all HTTP 200 with no console errors beyond expected pre-login 401s.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AddExpenseModal — new-vendor mini-form auto-select", "issue": "After saving a NEW vendor via the '+ Add New Vendor' mini-form, the created vendor (verified in DB via /api/transactions/vendors) is not auto-selected in expense-vendor-select; the Select trigger remains showing 'Select vendor' placeholder and the product Select block does not appear. Existing-vendor selection works perfectly (product Select appears immediately, submit + auto-quotation flow succeeds). Likely a state-race between qc.invalidateQueries(['txnVendors']) refetch and set('vendor_id', String(data.id)). Reproduction: open Add Expense → pick project & phase → open vendor dropdown → click '+ Add New Vendor' → fill mini-vendor-name/contact/category → click new-vendor-save → observe vendor field remains empty.", "selector": "[data-testid=\"expense-vendor-select\"] after [data-testid=\"new-vendor-save\"]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter20_transactions.py",
+    "/app/test_reports/pytest/iter20_results.xml"
+  ],
+  "action_items": [
+    "Investigate the auto-select-after-inline-create UX in AddExpenseModal: after saveMini for vendor (and likely product/employee too), the newly created id may not be reflected in the Select's controlled value until vendors query refetch completes. Consider (a) optimistically appending the created record to the query cache via qc.setQueryData before invalidateQueries, or (b) suppressing SelectValue placeholder when form.vendor_id is set even if the option isn't yet in the list."
+  ],
+  "critical_code_review_comments": [
+    "transactions.py add_expense_txn uses project.budget (raw budget) semantics for balance_after via budget_remaining helper — spec says project budget_remaining minus amount, which is correctly implemented (verified).",
+    "AddExpenseModal.jsx: qc.invalidateQueries(['txnVendors']) refetches the whole list; consider qc.setQueryData(['txnVendors'], (old) => [...(old||[]), {id, name}]) for instant auto-select UX.",
+    "IncomeCreate has no phase FK validation — phase is a free-text label (by design, per spec). OK.",
+    "Expense route STAFF role includes SiteEngineer+ProcurementOfficer — correctly gated; income route FIN role (Admin/Accountant) — SE 403 verified.",
+    "No unit-tests exist in repo for models — API-only integration tests. Acceptable for this iteration."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter20_transactions.py"
+  ],
+  "success_rate": {"backend": "100% (61/61)", "frontend": "~90% (all critical paths pass; 1 medium UI bug on inline-vendor auto-select)"},
+  "test_credentials": "See /app/memory/test_credentials.md — admin/accountant/SE/client/vendor logins all functional.",
+  "seed_data_creation": "Created via UI/API during tests: vendors 'TEST_UI_Vendor' (id 6) & 'TEST_Vendor_<ts>' (id 5), product 'TEST_UI_Product' (on vendor 6), 2 test employees, 3 income entries on project 3 (incl. override), 3+ expense entries on project 3 (incl. VQ-3-002 & VQ-3-003 auto-quotations).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New backend test file /app/backend/tests/test_iter20_transactions.py (20 tests) covers add_income (RBAC, validation, override, closed-project), add_expense (validation, vendor+auto-quotation, employee, SE allowed), inline vendor/product/employee, employee payments, ledger/balance-sheet/summary/org balance-sheet sync. Run with REACT_APP_BACKEND_URL=<url> pytest ... -o addopts=''. Frontend still has one UX quirk: newly-inline-created vendor in AddExpenseModal doesn't auto-select in the Select trigger although form state is set (verified vendor is created in DB). Workaround: user can re-open vendor dropdown and manually pick their new vendor. Overall feature is production-ready.",
+  "rca of the issue": "AddExpenseModal saveMini() calls qc.invalidateQueries(['txnVendors']) which triggers a refetch — during refetch, react-query returns previous data or undefined. Simultaneously set('vendor_id', String(data.id)) updates form state. shadcn Select renders SelectValue based on the current value matching a SelectItem in the list; if the new vendor's SelectItem isn't yet in the DOM at the moment the Select re-renders, it falls back to the placeholder. Fix: qc.setQueryData(['txnVendors'], old => [...(old||[]), {id: data.id, name: data.name}]) BEFORE (or in addition to) invalidateQueries — the same pattern applies to product & employee mini-flows."
+}

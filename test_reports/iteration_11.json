@@ -1,0 +1,35 @@
+{
+  "summary": "Tested FINANCE_004, VENDORS_001, FIELDOPS_001, PROJECT_002 across backend (pytest 9/9 passed) and frontend UI. Backend contract fully complete: profit_last_year field present with correct math, /projects/{1,2,3}/ledger returns credits+debits with net verification, org-wide employee creation (project_id=null), phase assignment (201) + duplicate 409 + unassign 204, project employees union includes phase-assigned emp, attendance for phase-member 201, attendance for non-member 422, vendor POST works, SE 403 regressions intact. Frontend UI: vendor Add + modal + create works and appears in table; PhaseCrew section renders on all 3 phases of project 1 with crew-add/chip/remove; SE portal shows org-employee-register + se-add-employee-button + 10 rows; Ledger section renders on project 1/2/3 finance pages with correct credit/debit/net figures.\n\nONE FRONTEND BUG FOUND (FINANCE_004): The Profit card on /admin/projects/{id}/finance is bound to s.profit (all-time) instead of s.profit_last_year, AND is missing the `sub` prop entirely, so the required `data-testid=\"pf-profit-period\"` element is NOT rendered. Currently displays 'Profit −₹5.03 Cr' with no date range. Expected: a positive/negative figure equal to revenue_last_year - cost_last_year plus a '1 year · YYYY-MM-DD → YYYY-MM-DD' subline.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ProjectFinancePage.jsx (line 95)",
+        "issue": "Profit summary card uses value={fmtCr(s.profit)} instead of s.profit_last_year and does NOT pass a `sub` prop, so the required data-testid=\"pf-profit-period\" 1-year date range is never rendered. FINANCE_004 spec not satisfied on the frontend.",
+        "selector": "[data-testid=\"pf-profit-period\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter11_new_flows.py",
+    "/app/test_reports/pytest/iter11.xml"
+  ],
+  "action_items": [
+    "Fix ProjectFinancePage.jsx Profit card (line 95): change value to fmtCr(s.profit_last_year) and add sub={`1 year · ${s.period_from} → ${s.period_to}`} so data-testid pf-profit-period is rendered."
+  ],
+  "critical_code_review_comments": [
+    "Backend contract for FINANCE_004 (profit_last_year, revenue_last_year, cost_last_year, period_from, period_to) is correct and consistent — the field is returned by /api/projects/{id}/finance/summary. Only the frontend consumer of that field is wrong.",
+    "PhaseCrew works well; API returns items with `employee_id` key (not `id`) — main agent may want to standardize this shape across employee-listing endpoints (project employees returns `id`, phase employees returns `employee_id`)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter11_new_flows.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "~90% (1 bug: pf-profit-period missing)"},
+  "test_credentials": "admin kesari4416@gmail.com/admin123; SE raj@buildcore.com/engineer123",
+  "seed_data_creation": "Created TEST_V_UI_* vendor, TEST_EMP_* org-wide employee (assigned then unassigned from phase), TEST_LEG_* project-scoped employee. All prefixed with TEST_.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Focus retest on FINANCE_004 pf-profit-period rendering after main agent fixes ProjectFinancePage line 95. Everything else — vendors add, PhaseCrew assign/remove, org-wide employee, attendance union, ledger section on p1/p2/p3, SE 403 regressions — verified passing.",
+  "rca of the issue": "FINANCE_004 partial regression: backend correctly returns profit_last_year but ProjectFinancePage.jsx binds the Profit card to the older s.profit field and omits the sub prop. Since ProjectFinanceSummaryCard only emits data-testid=`${testId}-period` when `sub` is truthy (line 23), pf-profit-period never renders. Two-line fix in ProjectFinancePage.jsx line 95."
+}
