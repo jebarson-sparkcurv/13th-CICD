@@ -667,26 +667,25 @@ jobs:
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
             "rsync -a /tmp/buildcore-deployment/deployment/frontend/ ${{ env.APP_DIR }}/frontend/"
 
-
+          
           # ----------------------------------------------------
           # PYTHON VIRTUAL ENVIRONMENT
           # ----------------------------------------------------
-
+          
           ssh \
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "cd ${{ env.APP_DIR }}/backend && rm -rf .venv && python3 -m venv .venv"
-
+            "cd ${{ env.APP_DIR }}/backend && rm -rf .venv && python3.12 -m venv .venv && .venv/bin/python --version"
+          
           ssh \
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
             "cd ${{ env.APP_DIR }}/backend && .venv/bin/python -m pip install --upgrade pip setuptools wheel"
-
+          
           ssh \
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
             "cd ${{ env.APP_DIR }}/backend && .venv/bin/pip install -r requirements.txt"
-
 
           # ----------------------------------------------------
           # INSTALL ENVIRONMENT FILE
