@@ -1,0 +1,878 @@
+name: Main - Production Build Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+  BACKEND_DIR: "backend"
+  FRONTEND_DIR: "frontend"
+
+  APP_NAME: "buildcore"
+  APP_DIR: "/opt/buildcore"
+  BACKEND_PORT: "8000"
+
+
+# ============================================================
+# 1. BACKEND TEST
+# ============================================================
+
+jobs:
+
+  backend-test:
+    name: Backend Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: buildcore
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: buildcore
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U buildcore -d buildcore"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://buildcore:testpassword@127.0.0.1:5432/buildcore
+
+    steps:
+
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check Python version
+        run: |
+          python --version
+          python3 --version
+
+      - name: Create Python virtual environment
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          python -m venv .venv
+          .venv/bin/python --version
+          .venv/bin/pip --version
+
+      - name: Upgrade pip
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          .venv/bin/pip install --upgrade pip
+
+      - name: Install backend dependencies
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Run database migrations
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          .venv/bin/alembic upgrade head
+
+      - name: Compile backend Python files
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          .venv/bin/python -m compileall .
+
+      - name: Start backend server
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          nohup .venv/bin/uvicorn app.main:app \
+            --host 127.0.0.1 \
+            --port 8001 \
+            > /tmp/buildcore-backend.log 2>&1 &
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8001/api/; then
+              echo "Backend started successfully"
+              break
+            fi
+
+            echo "Waiting for backend..."
+            sleep 2
+          done
+
+          curl -fsS http://127.0.0.1:8001/api/
+
+      - name: Run backend tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          .venv/bin/pytest
+
+
+# ============================================================
+# 2. FRONTEND BUILD
+# ============================================================
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Yarn 1.22.22
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn --version
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: |
+          yarn install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: ${{ env.FRONTEND_DIR }}
+        env:
+          REACT_APP_BACKEND_URL: http://${{ secrets.PROD_SERVER_PUBLIC_HOST }}
+        run: |
+          echo "Frontend backend URL:"
+          echo "$REACT_APP_BACKEND_URL"
+
+          yarn build
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-frontend-build
+          path: frontend/build
+
+
+# ============================================================
+# 3. DEPLOY TO FRESH PRODUCTION EC2
+# ============================================================
+
+  deploy-production:
+    name: Deploy to Production EC2
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-test
+      - frontend-build
+
+    steps:
+
+      # --------------------------------------------------------
+      # CHECKOUT
+      # --------------------------------------------------------
+
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------------
+      # DOWNLOAD FRONTEND BUILD
+      # --------------------------------------------------------
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: production-frontend-build
+          path: frontend-build
+
+      # --------------------------------------------------------
+      # CHECK FILES
+      # --------------------------------------------------------
+
+      - name: Check deployment files
+        run: |
+          echo "Backend:"
+          ls -la backend
+
+          echo ""
+          echo "Frontend build:"
+          ls -la frontend-build
+
+      # --------------------------------------------------------
+      # CREATE DEPLOYMENT PACKAGE
+      # --------------------------------------------------------
+
+      - name: Create deployment package
+        run: |
+          tar -czf production-deployment.tar.gz \
+            backend \
+            frontend-build
+
+          ls -lh production-deployment.tar.gz
+
+      # --------------------------------------------------------
+      # CREATE SSH KEY
+      # --------------------------------------------------------
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.PROD_SERVER_SSH_KEY }}" > ~/.ssh/production-server-key
+
+          chmod 600 ~/.ssh/production-server-key
+
+      # --------------------------------------------------------
+      # TEST SSH CONNECTION
+      # --------------------------------------------------------
+
+      - name: Test SSH connection
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "echo 'SSH connection successful'"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # WAIT FOR UBUNTU PACKAGE MANAGER
+      # --------------------------------------------------------
+
+      - name: Wait for package manager
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "for i in \$(seq 1 60); do \
+              if sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+                 sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+                 sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; then \
+                echo 'Waiting for Ubuntu package manager...'; \
+                sleep 5; \
+              else \
+                echo 'Package manager is available'; \
+                break; \
+              fi; \
+            done"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # FIX DPKG
+      # --------------------------------------------------------
+
+      - name: Configure dpkg
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo dpkg --configure -a"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # UPDATE APT
+      # --------------------------------------------------------
+
+      - name: Update apt
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo apt-get update"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # INSTALL PYTHON 3.12
+      # POSTGRESQL
+      # NGINX
+      # RSYNC
+      # CURL
+      # --------------------------------------------------------
+
+      - name: Install production packages
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo apt-get install -y software-properties-common"
+
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo add-apt-repository -y ppa:deadsnakes/ppa"
+
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo apt-get update"
+
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              python3.12 \
+              python3.12-venv \
+              python3.12-dev \
+              postgresql \
+              postgresql-contrib \
+              nginx \
+              rsync \
+              curl"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # VERIFY PYTHON
+      # --------------------------------------------------------
+
+      - name: Verify Python 3.12
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "python3.12 --version"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE SWAP
+      # --------------------------------------------------------
+
+      - name: Configure production swap
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "if ! sudo swapon --show | grep -q '/swapfile'; then \
+              sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048; \
+              sudo chmod 600 /swapfile; \
+              sudo mkswap /swapfile; \
+              sudo swapon /swapfile; \
+              echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab; \
+            else \
+              echo 'Swap already exists'; \
+            fi"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CHECK MEMORY
+      # --------------------------------------------------------
+
+      - name: Check production memory
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "free -h && echo '--- SWAP ---' && swapon --show"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE APPLICATION DIRECTORY
+      # --------------------------------------------------------
+
+      - name: Create application directory
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo mkdir -p ${{ env.APP_DIR }} && \
+             sudo chown -R $PROD_SERVER_USER:$PROD_SERVER_USER ${{ env.APP_DIR }}"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # COPY APPLICATION PACKAGE
+      # --------------------------------------------------------
+
+      - name: Copy application package
+        run: |
+          scp \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            production-deployment.tar.gz \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST:/tmp/production-deployment.tar.gz"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # EXTRACT APPLICATION
+      # --------------------------------------------------------
+
+      - name: Extract application
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo rm -rf ${{ env.APP_DIR }}/backend ${{ env.APP_DIR }}/frontend-build && \
+             sudo tar -xzf /tmp/production-deployment.tar.gz -C ${{ env.APP_DIR }} && \
+             sudo chown -R $PROD_SERVER_USER:$PROD_SERVER_USER ${{ env.APP_DIR }}"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE PYTHON 3.12 VENV
+      # --------------------------------------------------------
+
+      - name: Create Python 3.12 virtual environment
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "cd ${{ env.APP_DIR }}/backend && \
+             rm -rf .venv && \
+             python3.12 -m venv .venv && \
+             .venv/bin/python --version"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # UPGRADE PIP
+      # --------------------------------------------------------
+
+      - name: Upgrade production pip
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "cd ${{ env.APP_DIR }}/backend && \
+             .venv/bin/pip install --upgrade pip"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # INSTALL BACKEND DEPENDENCIES
+      # --------------------------------------------------------
+
+      - name: Install production backend dependencies
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "cd ${{ env.APP_DIR }}/backend && \
+             .venv/bin/pip install -r requirements.txt"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE DATABASE ROLE
+      # --------------------------------------------------------
+
+      - name: Create production database role
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"DO \\\$\\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='buildcore') THEN CREATE ROLE buildcore LOGIN; END IF; END \\\$\\\$;\""
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # SET DATABASE PASSWORD
+      # --------------------------------------------------------
+
+      - name: Set production database password
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo -u postgres psql -v ON_ERROR_STOP=1 -c \"ALTER ROLE buildcore WITH PASSWORD '${{ secrets.PROD_DATABASE_PASSWORD }}';\""
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE DATABASE
+      # --------------------------------------------------------
+
+      - name: Create production database
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo -u postgres psql -tc \"SELECT 1 FROM pg_database WHERE datname='buildcore'\" | grep -q 1 || sudo -u postgres createdb -O buildcore buildcore"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE ENVIRONMENT FILE
+      # --------------------------------------------------------
+
+      - name: Create production environment file
+        run: |
+          cat > buildcore-production.env <<EOF
+          DATABASE_URL=postgresql+psycopg2://buildcore:${{ secrets.PROD_DATABASE_PASSWORD }}@127.0.0.1:5432/buildcore
+
+          JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+
+          SUPERADMIN_EMAIL=${{ secrets.PROD_SUPERADMIN_EMAIL }}
+          SUPERADMIN_PASSWORD=${{ secrets.PROD_SUPERADMIN_PASSWORD }}
+
+          ADMIN_EMAIL=${{ secrets.PROD_ADMIN_EMAIL }}
+          ADMIN_PASSWORD=${{ secrets.PROD_ADMIN_PASSWORD }}
+
+          CORS_ORIGINS=${{ secrets.PROD_CORS_ORIGINS }}
+          EOF
+
+          chmod 600 buildcore-production.env
+
+      # --------------------------------------------------------
+      # COPY ENVIRONMENT FILE
+      # --------------------------------------------------------
+
+      - name: Copy production environment file
+        run: |
+          scp \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            buildcore-production.env \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST:/tmp/buildcore-production.env"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # INSTALL ENVIRONMENT FILE
+      # --------------------------------------------------------
+
+      - name: Install production environment file
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo mv /tmp/buildcore-production.env ${{ env.APP_DIR }}/backend/.env && \
+             sudo chown $PROD_SERVER_USER:$PROD_SERVER_USER ${{ env.APP_DIR }}/backend/.env && \
+             sudo chmod 600 ${{ env.APP_DIR }}/backend/.env"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # RUN DATABASE MIGRATIONS
+      # --------------------------------------------------------
+
+      - name: Run production database migrations
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "cd ${{ env.APP_DIR }}/backend && \
+             set -a && \
+             . ./.env && \
+             set +a && \
+             .venv/bin/alembic upgrade head"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE SYSTEMD SERVICE
+      # --------------------------------------------------------
+
+      - name: Create backend systemd service
+        run: |
+          cat > buildcore-backend.service <<EOF
+          [Unit]
+          Description=BuildCore FastAPI Backend
+          After=network.target postgresql.service
+          Requires=postgresql.service
+
+          [Service]
+          User=${{ secrets.PROD_SERVER_USER }}
+          Group=${{ secrets.PROD_SERVER_USER }}
+
+          WorkingDirectory=${{ env.APP_DIR }}/backend
+
+          EnvironmentFile=${{ env.APP_DIR }}/backend/.env
+
+          ExecStart=${{ env.APP_DIR }}/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port ${{ env.BACKEND_PORT }}
+
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+      # --------------------------------------------------------
+      # COPY SYSTEMD SERVICE
+      # --------------------------------------------------------
+
+      - name: Copy systemd service
+        run: |
+          scp \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            buildcore-backend.service \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST:/tmp/buildcore-backend.service"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # INSTALL SYSTEMD SERVICE
+      # --------------------------------------------------------
+
+      - name: Enable backend service
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo mv /tmp/buildcore-backend.service /etc/systemd/system/buildcore-backend.service && \
+             sudo systemctl daemon-reload && \
+             sudo systemctl enable buildcore-backend && \
+             sudo systemctl restart buildcore-backend"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # WAIT FOR BACKEND
+      # --------------------------------------------------------
+
+      - name: Wait for backend
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "for i in \$(seq 1 30); do \
+              if curl -fsS http://127.0.0.1:${{ env.BACKEND_PORT }}/api/; then \
+                echo 'Production backend is healthy'; \
+                break; \
+              fi; \
+              echo 'Waiting for production backend...'; \
+              sleep 2; \
+            done && \
+            curl -fsS http://127.0.0.1:${{ env.BACKEND_PORT }}/api/"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # CREATE NGINX CONFIG
+      # --------------------------------------------------------
+
+      - name: Create Nginx configuration
+        run: |
+          cat > buildcore-production.conf <<EOF
+          server {
+              listen 80;
+              listen [::]:80;
+
+              server_name _;
+
+              root ${{ env.APP_DIR }}/frontend-build;
+              index index.html;
+
+              location /api/ {
+                  proxy_pass http://127.0.0.1:${{ env.BACKEND_PORT }};
+                  proxy_http_version 1.1;
+
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+              }
+
+              location / {
+                  try_files \$uri \$uri/ /index.html;
+              }
+          }
+          EOF
+
+      # --------------------------------------------------------
+      # COPY NGINX CONFIG
+      # --------------------------------------------------------
+
+      - name: Copy Nginx configuration
+        run: |
+          scp \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            buildcore-production.conf \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST:/tmp/buildcore-production.conf"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # INSTALL NGINX CONFIG
+      # --------------------------------------------------------
+
+      - name: Configure Nginx
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "sudo mv /tmp/buildcore-production.conf /etc/nginx/sites-available/buildcore && \
+             sudo ln -sf /etc/nginx/sites-available/buildcore /etc/nginx/sites-enabled/buildcore && \
+             sudo rm -f /etc/nginx/sites-enabled/default && \
+             sudo nginx -t && \
+             sudo systemctl enable nginx && \
+             sudo systemctl reload nginx"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # FINAL BACKEND HEALTH CHECK
+      # --------------------------------------------------------
+
+      - name: Production backend health check
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "curl --fail --retry 10 --retry-delay 3 http://127.0.0.1/api/"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # FINAL FRONTEND HEALTH CHECK
+      # --------------------------------------------------------
+
+      - name: Production frontend health check
+        run: |
+          ssh \
+            -i ~/.ssh/production-server-key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$PROD_SERVER_USER@$PROD_SERVER_HOST" \
+            "curl --fail --retry 10 --retry-delay 3 http://127.0.0.1/"
+
+        env:
+          PROD_SERVER_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          PROD_SERVER_USER: ${{ secrets.PROD_SERVER_USER }}
+
+      # --------------------------------------------------------
+      # FINAL STATUS
+      # --------------------------------------------------------
+
+      - name: Production deployment successful
+        run: |
+          echo "================================================"
+          echo "PRODUCTION DEPLOYMENT SUCCESSFUL"
+          echo "================================================"
+          echo "Branch : main"
+          echo "Commit : ${{ github.sha }}"
+          echo "Build  : ${{ github.run_number }}"
+          echo ""
+          echo "Backend : HEALTHY"
+          echo "Frontend: HEALTHY"
+          echo "Nginx   : HEALTHY"
+          echo "Database: MIGRATED"
+          echo "================================================"
