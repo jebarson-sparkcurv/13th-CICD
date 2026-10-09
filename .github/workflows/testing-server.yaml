@@ -110,11 +110,25 @@ jobs:
         run: |
           .venv/bin/python -m compileall app
 
-      - name: Run backend tests
+      - name: Start backend server
         working-directory: ${{ env.BACKEND_DIR }}
         run: |
-          .venv/bin/pytest
-
+          nohup .venv/bin/uvicorn app.main:app \
+            --host 127.0.0.1 \
+            --port 8001 \
+            > /tmp/buildcore-backend.log 2>&1 &
+      
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8001/api/; then
+              echo "Backend started successfully"
+              break
+            fi
+      
+            echo "Waiting for backend..."
+            sleep 2
+          done
+      
+          curl -fsS http://127.0.0.1:8001/api/
 
   # ============================================================
   # JOB 2 - FRONTEND BUILD
