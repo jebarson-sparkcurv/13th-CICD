@@ -1,4 +1,3 @@
-
 name: Developer - Build Test Deploy
 
 on:
@@ -26,13 +25,10 @@ jobs:
   # ============================================================
 
   backend-test:
-
     name: Backend - Install and Test
-
     runs-on: ubuntu-latest
 
     services:
-
       postgres:
         image: postgres:16
 
@@ -51,9 +47,7 @@ jobs:
           --health-retries=5
 
     env:
-
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/buildcore_test
-
       JWT_SECRET: github-actions-test-secret
 
       SUPERADMIN_EMAIL: test-superadmin@example.com
@@ -72,103 +66,52 @@ jobs:
 
     steps:
 
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
       - name: Checkout developer branch
         uses: actions/checkout@v4
 
-      # --------------------------------------------------------
-      # Python
-      # --------------------------------------------------------
-
       - name: Setup Python
         uses: actions/setup-python@v5
-
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      # --------------------------------------------------------
-      # Create virtual environment
-      # --------------------------------------------------------
-
       - name: Create Python virtual environment
-
         working-directory: ${{ env.BACKEND_DIR }}
-
         run: |
           python -m venv .venv
-
           .venv/bin/python --version
           .venv/bin/pip --version
 
-      # --------------------------------------------------------
-      # Upgrade pip tools
-      # --------------------------------------------------------
-
       - name: Upgrade pip tools
-
         working-directory: ${{ env.BACKEND_DIR }}
-
         run: |
           .venv/bin/python -m pip install --upgrade pip setuptools wheel
 
-      # --------------------------------------------------------
-      # Install backend dependencies
-      # --------------------------------------------------------
-
       - name: Install backend dependencies
-
         working-directory: ${{ env.BACKEND_DIR }}
-
         run: |
           .venv/bin/pip install -r requirements.txt
 
-      # --------------------------------------------------------
-      # Check PostgreSQL
-      # --------------------------------------------------------
-
       - name: Check PostgreSQL
-
         run: |
           pg_isready \
             -h 127.0.0.1 \
             -p 5432 \
             -U postgres
 
-      # --------------------------------------------------------
-      # Database migration
-      # --------------------------------------------------------
-
       - name: Run database migrations
-
         working-directory: ${{ env.BACKEND_DIR }}
-
         run: |
           .venv/bin/alembic upgrade head
 
-      # --------------------------------------------------------
-      # Python syntax check
-      # --------------------------------------------------------
-
       - name: Validate Python code
-
         working-directory: ${{ env.BACKEND_DIR }}
-
         run: |
           .venv/bin/python -m compileall app
 
-      # --------------------------------------------------------
-      # Run tests
-      # --------------------------------------------------------
-
       - name: Run backend tests
-
         working-directory: ${{ env.BACKEND_DIR }}
-
         run: |
           .venv/bin/pytest
 
@@ -178,79 +121,42 @@ jobs:
   # ============================================================
 
   frontend-build:
-
     name: Frontend - Install and Build
-
     runs-on: ubuntu-latest
 
     steps:
 
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
       - name: Checkout developer branch
         uses: actions/checkout@v4
 
-      # --------------------------------------------------------
-      # Node.js
-      # --------------------------------------------------------
-
       - name: Setup Node.js
-
         uses: actions/setup-node@v4
-
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
-      # --------------------------------------------------------
-      # Enable exact Yarn version
-      # --------------------------------------------------------
-
       - name: Setup Yarn
-
         working-directory: ${{ env.FRONTEND_DIR }}
-
         run: |
           corepack enable
           corepack prepare yarn@1.22.22 --activate
           yarn --version
 
-      # --------------------------------------------------------
-      # Install frontend dependencies
-      # --------------------------------------------------------
-
       - name: Install frontend dependencies
-
         working-directory: ${{ env.FRONTEND_DIR }}
-
         run: |
           yarn install --frozen-lockfile
 
-      # --------------------------------------------------------
-      # Build frontend
-      # --------------------------------------------------------
-
       - name: Build frontend
-
         working-directory: ${{ env.FRONTEND_DIR }}
-
         env:
           REACT_APP_BACKEND_URL: http://${{ secrets.TEST_SERVER_HOST }}/api
-
         run: |
           yarn build
 
-      # --------------------------------------------------------
-      # Upload frontend build
-      # --------------------------------------------------------
-
       - name: Upload frontend build
-
         uses: actions/upload-artifact@v4
-
         with:
           name: frontend-build-${{ github.sha }}
           path: frontend/build
@@ -262,9 +168,7 @@ jobs:
   # ============================================================
 
   deploy-testing:
-
     name: Deploy to Testing EC2
-
     runs-on: ubuntu-latest
 
     needs:
@@ -274,32 +178,30 @@ jobs:
     steps:
 
       # --------------------------------------------------------
-      # Checkout
+      # CHECKOUT
       # --------------------------------------------------------
 
       - name: Checkout developer branch
         uses: actions/checkout@v4
 
+
       # --------------------------------------------------------
-      # Download frontend build
+      # DOWNLOAD FRONTEND BUILD
       # --------------------------------------------------------
 
       - name: Download frontend build
-
         uses: actions/download-artifact@v4
-
         with:
           name: frontend-build-${{ github.sha }}
           path: frontend/build
 
-      # ========================================================
+
+      # --------------------------------------------------------
       # CREATE DEPLOYMENT PACKAGE
-      # ========================================================
+      # --------------------------------------------------------
 
       - name: Create deployment package
-
         run: |
-
           set -e
 
           rm -rf deployment
@@ -333,17 +235,14 @@ jobs:
       # ========================================================
 
       - name: Configure SSH
-
         env:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
           TEST_SERVER_SSH_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
 
         run: |
-
           set -e
 
           mkdir -p ~/.ssh
-
           chmod 700 ~/.ssh
 
           printf '%s\n' "$TEST_SERVER_SSH_KEY" \
@@ -362,13 +261,11 @@ jobs:
       # ========================================================
 
       - name: Test SSH connection
-
         env:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
           TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
 
         run: |
-
           ssh \
             -i ~/.ssh/testing-server-key \
             -o BatchMode=yes \
@@ -377,17 +274,15 @@ jobs:
 
 
       # ========================================================
-      # COPY APPLICATION TO SERVER
+      # COPY APPLICATION PACKAGE
       # ========================================================
 
       - name: Copy deployment package
-
         env:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
           TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
 
         run: |
-
           scp \
             -i ~/.ssh/testing-server-key \
             buildcore-${GITHUB_SHA}.tar.gz \
@@ -395,15 +290,12 @@ jobs:
 
 
       # ========================================================
-      # CREATE ENV FILE LOCALLY
+      # CREATE ENVIRONMENT FILE
       # ========================================================
 
       - name: Create backend environment file
-
         env:
-
           TEST_DATABASE_PASSWORD: ${{ secrets.TEST_DATABASE_PASSWORD }}
-
           TEST_JWT_SECRET: ${{ secrets.TEST_JWT_SECRET }}
 
           TEST_SUPERADMIN_EMAIL: ${{ secrets.TEST_SUPERADMIN_EMAIL }}
@@ -427,72 +319,140 @@ jobs:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
 
         run: |
+          set -e
 
           cat > buildcore.env <<EOF
-            DATABASE_URL=postgresql+psycopg2://buildcore:${TEST_DATABASE_PASSWORD}@127.0.0.1:5432/buildcore
-            
-            JWT_SECRET=${TEST_JWT_SECRET}
-            
-            SUPERADMIN_EMAIL=${TEST_SUPERADMIN_EMAIL}
-            SUPERADMIN_PASSWORD=${TEST_SUPERADMIN_PASSWORD}
-            
-            ADMIN_EMAIL=${TEST_ADMIN_EMAIL}
-            ADMIN_PASSWORD=${TEST_ADMIN_PASSWORD}
-            
-            CORS_ORIGINS=${TEST_CORS_ORIGINS}
-            
-            FRONTEND_URL=http://${TEST_SERVER_HOST}
-            PUBLIC_BASE_URL=http://${TEST_SERVER_HOST}
-            PUBLIC_APP_URL=http://${TEST_SERVER_HOST}
-            
-            SMTP_HOST=${TEST_SMTP_HOST}
-            SMTP_PORT=${TEST_SMTP_PORT}
-            SMTP_EMAIL=${TEST_SMTP_EMAIL}
-            SMTP_PASSWORD=${TEST_SMTP_PASSWORD}
-            
-            GEMINI_API_KEY=${TEST_GEMINI_API_KEY}
-            
-            ANTHROPIC_API_KEY=${TEST_ANTHROPIC_API_KEY}
-            ANTHROPIC_WORKSPACE_ID=${TEST_ANTHROPIC_WORKSPACE_ID}
-            
-            SEED_DEMO_DATA=false
-            EOF
+          DATABASE_URL=postgresql+psycopg2://buildcore:${TEST_DATABASE_PASSWORD}@127.0.0.1:5432/buildcore
+          JWT_SECRET=${TEST_JWT_SECRET}
+          
+          SUPERADMIN_EMAIL=${TEST_SUPERADMIN_EMAIL}
+          SUPERADMIN_PASSWORD=${TEST_SUPERADMIN_PASSWORD}
+          
+          ADMIN_EMAIL=${TEST_ADMIN_EMAIL}
+          ADMIN_PASSWORD=${TEST_ADMIN_PASSWORD}
+          
+          CORS_ORIGINS=${TEST_CORS_ORIGINS}
+          
+          FRONTEND_URL=http://${TEST_SERVER_HOST}
+          PUBLIC_BASE_URL=http://${TEST_SERVER_HOST}
+          PUBLIC_APP_URL=http://${TEST_SERVER_HOST}
+          
+          SMTP_HOST=${TEST_SMTP_HOST}
+          SMTP_PORT=${TEST_SMTP_PORT}
+          SMTP_EMAIL=${TEST_SMTP_EMAIL}
+          SMTP_PASSWORD=${TEST_SMTP_PASSWORD}
+          
+          GEMINI_API_KEY=${TEST_GEMINI_API_KEY}
+          
+          ANTHROPIC_API_KEY=${TEST_ANTHROPIC_API_KEY}
+          ANTHROPIC_WORKSPACE_ID=${TEST_ANTHROPIC_WORKSPACE_ID}
+          
+          SEED_DEMO_DATA=false
+          EOF
 
           chmod 600 buildcore.env
 
 
       # ========================================================
-      # COPY ENV FILE TO EC2
+      # CREATE SYSTEMD CONFIG LOCALLY
       # ========================================================
 
-      - name: Copy environment file
+      - name: Create systemd service file
+        env:
+          TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
 
+        run: |
+          cat > buildcore-backend.service <<EOF
+          [Unit]
+          Description=BuildCore FastAPI Backend
+          After=network.target postgresql.service
+          Requires=postgresql.service
+          
+          [Service]
+          Type=simple
+          User=${TEST_SERVER_USER}
+          WorkingDirectory=${{ env.APP_DIR }}/backend
+          EnvironmentFile=${{ env.APP_DIR }}/backend/.env
+          ExecStart=${{ env.APP_DIR }}/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port ${{ env.BACKEND_PORT }}
+          Restart=always
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+
+      # ========================================================
+      # CREATE NGINX CONFIG LOCALLY
+      # ========================================================
+
+      - name: Create Nginx configuration
+        run: |
+          cat > buildcore-nginx.conf <<EOF
+          server {
+              listen 80;
+              server_name _;
+          
+              root ${{ env.APP_DIR }}/frontend;
+              index index.html;
+          
+              client_max_body_size 100M;
+          
+              location / {
+                  try_files \$uri \$uri/ /index.html;
+              }
+          
+              location /api/ {
+                  proxy_pass http://127.0.0.1:${{ env.BACKEND_PORT }};
+                  proxy_http_version 1.1;
+          
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+          
+                  proxy_connect_timeout 60;
+                  proxy_send_timeout 300;
+                  proxy_read_timeout 300;
+              }
+          }
+          EOF
+
+
+      # ========================================================
+      # COPY CONFIGURATION FILES TO EC2
+      # ========================================================
+
+      - name: Copy configuration files
         env:
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
           TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
 
         run: |
-
           scp \
             -i ~/.ssh/testing-server-key \
             buildcore.env \
-            "$TEST_SERVER_USER@$TEST_SERVER_HOST:/tmp/buildcore.env"
+            buildcore-backend.service \
+            buildcore-nginx.conf \
+            "$TEST_SERVER_USER@$TEST_SERVER_HOST:/tmp/"
 
 
       # ========================================================
-      # BOOTSTRAP AND DEPLOY EC2
+      # BOOTSTRAP AND DEPLOY
       # ========================================================
 
       - name: Bootstrap and deploy testing server
-
         env:
-
           TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
           TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
+          TEST_DATABASE_PASSWORD: ${{ secrets.TEST_DATABASE_PASSWORD }}
 
         run: |
-
           set -e
+
+          echo "========================================="
+          echo "TESTING SERVER BOOTSTRAP"
+          echo "========================================="
 
 
           # ----------------------------------------------------
@@ -506,7 +466,7 @@ jobs:
 
 
           # ----------------------------------------------------
-          # UPDATE UBUNTU
+          # UPDATE SERVER
           # ----------------------------------------------------
 
           ssh \
@@ -516,7 +476,7 @@ jobs:
 
 
           # ----------------------------------------------------
-          # INSTALL REQUIRED SOFTWARE
+          # INSTALL SOFTWARE
           # ----------------------------------------------------
 
           ssh \
@@ -566,13 +526,13 @@ jobs:
 
 
           # ----------------------------------------------------
-          # CREATE DATABASE USER
+          # CREATE / UPDATE DATABASE USER
           # ----------------------------------------------------
 
           ssh \
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "sudo -u postgres psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='buildcore'\" | grep -q 1 || sudo -u postgres psql -c \"CREATE USER buildcore WITH PASSWORD 'testing-db-password';\""
+            "sudo -u postgres psql -v db_password=\"$TEST_DATABASE_PASSWORD\" -v ON_ERROR_STOP=1 -c \"DO \\\$\\\$ BEGIN IF EXISTS (SELECT FROM pg_roles WHERE rolname='buildcore') THEN ALTER ROLE buildcore WITH PASSWORD :'db_password'; ELSE CREATE ROLE buildcore LOGIN PASSWORD :'db_password'; END IF; END \\\$\\\$;\""
 
 
           # ----------------------------------------------------
@@ -586,7 +546,7 @@ jobs:
 
 
           # ----------------------------------------------------
-          # CREATE APPLICATION DIRECTORY
+          # APPLICATION DIRECTORY
           # ----------------------------------------------------
 
           ssh \
@@ -601,7 +561,7 @@ jobs:
 
 
           # ----------------------------------------------------
-          # EXTRACT APPLICATION
+          # EXTRACT PACKAGE
           # ----------------------------------------------------
 
           ssh \
@@ -661,7 +621,7 @@ jobs:
 
 
           # ----------------------------------------------------
-          # INSTALL PYTHON ENVIRONMENT
+          # PYTHON VIRTUAL ENVIRONMENT
           # ----------------------------------------------------
 
           ssh \
@@ -681,7 +641,7 @@ jobs:
 
 
           # ----------------------------------------------------
-          # INSTALL ENV FILE
+          # INSTALL ENVIRONMENT FILE
           # ----------------------------------------------------
 
           ssh \
@@ -711,35 +671,18 @@ jobs:
 
 
           # ----------------------------------------------------
-          # CREATE SYSTEMD SERVICE
+          # INSTALL SYSTEMD SERVICE
           # ----------------------------------------------------
 
           ssh \
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "sudo tee /etc/systemd/system/buildcore-backend.service > /dev/null" <<EOF
-          [Unit]
-          Description=BuildCore FastAPI Backend
-          After=network.target postgresql.service
-          Requires=postgresql.service
-          
-          [Service]
-          Type=simple
-          User=$TEST_SERVER_USER
-          WorkingDirectory=${{ env.APP_DIR }}/backend
-          EnvironmentFile=${{ env.APP_DIR }}/backend/.env
-          ExecStart=${{ env.APP_DIR }}/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port ${{ env.BACKEND_PORT }}
-          Restart=always
-          RestartSec=5
-          
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          
+            "sudo mv /tmp/buildcore-backend.service /etc/systemd/system/buildcore-backend.service"
 
-          # ----------------------------------------------------
-          # START BACKEND
-          # ----------------------------------------------------
+          ssh \
+            -i ~/.ssh/testing-server-key \
+            "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+            "sudo chmod 644 /etc/systemd/system/buildcore-backend.service"
 
           ssh \
             -i ~/.ssh/testing-server-key \
@@ -768,46 +711,13 @@ jobs:
 
 
           # ----------------------------------------------------
-          # CREATE NGINX CONFIG
+          # INSTALL NGINX CONFIG
           # ----------------------------------------------------
 
           ssh \
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "sudo tee /etc/nginx/sites-available/buildcore > /dev/null" <<EOF
-          server {
-              listen 80;
-              server_name _;
-          
-              root ${{ env.APP_DIR }}/frontend;
-              index index.html;
-          
-              client_max_body_size 100M;
-          
-              location / {
-                  try_files \$uri \$uri/ /index.html;
-              }
-          
-              location /api/ {
-                  proxy_pass http://127.0.0.1:${{ env.BACKEND_PORT }};
-                  proxy_http_version 1.1;
-          
-                  proxy_set_header Host \$host;
-                  proxy_set_header X-Real-IP \$remote_addr;
-                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto \$scheme;
-          
-                  proxy_connect_timeout 60;
-                  proxy_send_timeout 300;
-                  proxy_read_timeout 300;
-              }
-          }
-          EOF
-
-
-          # ----------------------------------------------------
-          # ENABLE NGINX
-          # ----------------------------------------------------
+            "sudo mv /tmp/buildcore-nginx.conf /etc/nginx/sites-available/buildcore"
 
           ssh \
             -i ~/.ssh/testing-server-key \
@@ -836,7 +746,7 @@ jobs:
 
 
           # ----------------------------------------------------
-          # FINAL TEST
+          # FINAL HEALTH CHECK
           # ----------------------------------------------------
 
           ssh \
@@ -881,9 +791,7 @@ jobs:
       # ========================================================
 
       - name: Deployment completed
-
         run: |
-
           echo "============================================"
           echo "CI/CD PIPELINE COMPLETED SUCCESSFULLY"
           echo "============================================"
