@@ -479,17 +479,34 @@ jobs:
             -i ~/.ssh/testing-server-key \
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
             "hostname"
-
-
-          # ----------------------------------------------------
-          # UPDATE SERVER
-          # ----------------------------------------------------
-
-          ssh \
-            -i ~/.ssh/testing-server-key \
-            "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "sudo apt-get update"
-
+                # ----------------------------------------------------
+                # WAIT FOR PACKAGE MANAGER
+                # ----------------------------------------------------
+                
+                ssh \
+                  -i ~/.ssh/testing-server-key \
+                  "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+                  "for i in \$(seq 1 60); do \
+                     if sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+                        sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+                        sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; then \
+                       echo 'Waiting for Ubuntu package manager...'; \
+                       sleep 5; \
+                     else \
+                       echo 'Package manager is available'; \
+                       break; \
+                     fi; \
+                   done"
+                
+                
+                # ----------------------------------------------------
+                # UPDATE SERVER
+                # ----------------------------------------------------
+                
+                ssh \
+                  -i ~/.ssh/testing-server-key \
+                  "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+                  "sudo apt-get update"
             # ----------------------------------------------------
             # INSTALL SOFTWARE
             # ----------------------------------------------------
