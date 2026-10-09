@@ -399,6 +399,8 @@ jobs:
       # ========================================================
       # CREATE NGINX CONFIG LOCALLY
       # ========================================================
+      - name: checking the version
+        run:  python3 --version
 
       - name: Create Nginx configuration
         run: |
