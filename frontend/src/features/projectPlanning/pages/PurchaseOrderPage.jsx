@@ -138,9 +138,10 @@ export default function PurchaseOrderPage() {
     setTax(Number(data.tax || 0));
     setNotes(data.notes || "");
   };
-
-  useEffect(() => { bootstrap(); /* eslint-disable-next-line */ }, [quotationId]);
-
+	useEffect(() => {
+  bootstrap();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [quotationId]);
   // Live totals (backend still authoritative on save)
   const totals = useMemo(() => {
     const rows = items.map((it) => ({

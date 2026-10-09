@@ -62,6 +62,7 @@ function AutoFit({ onFit }) {
       onFit?.(bounds);
     }, 60);
     return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
 }
@@ -86,9 +87,9 @@ function CameraRig({ preset, target, radius, orbitRef, onDone }) {
       toT: target.clone(),
       t: 0,
     };
-    if (orbitRef.current) orbitRef.current.enabled = false;
+     if (orbitRef.current) orbitRef.current.enabled = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset]);
-
   useFrame((_, dt) => {
     if (!active.current) return;
     active.current.t = Math.min(1, active.current.t + dt * 1.6);
