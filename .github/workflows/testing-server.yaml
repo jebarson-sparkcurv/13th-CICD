@@ -490,17 +490,29 @@ jobs:
             "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
             "sudo apt-get update"
 
-
-          # ----------------------------------------------------
-          # INSTALL SOFTWARE
-          # ----------------------------------------------------
-
-          ssh \
-            -i ~/.ssh/testing-server-key \
-            "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
-            "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip python3-venv postgresql postgresql-contrib nginx rsync curl"
-
-
+            # ----------------------------------------------------
+            # INSTALL SOFTWARE
+            # ----------------------------------------------------
+            
+            ssh \
+              -i ~/.ssh/testing-server-key \
+              "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+              "sudo apt-get install -y software-properties-common"
+            
+            ssh \
+              -i ~/.ssh/testing-server-key \
+              "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+              "sudo add-apt-repository ppa:deadsnakes/ppa -y"
+            
+            ssh \
+              -i ~/.ssh/testing-server-key \
+              "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+              "sudo apt-get update"
+            
+            ssh \
+              -i ~/.ssh/testing-server-key \
+              "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+              "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12 python3.12-venv python3.12-dev postgresql postgresql-contrib nginx rsync curl"
           # ----------------------------------------------------
           # VERIFY SOFTWARE
           # ----------------------------------------------------
